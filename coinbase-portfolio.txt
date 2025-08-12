@@ -1,0 +1,31 @@
+# Coinbase Portfolio
+
+## Holdings
+
+### Bitcoin (BTC)
+- Amount: 0.5 BTC
+- Average Buy Price: $42,000
+- Current Value: (Real-time)
+
+### Ethereum (ETH)
+- Amount: 5 ETH
+- Average Buy Price: $2,800
+- Current Value: (Real-time)
+
+### Solana (SOL)
+- Amount: 50 SOL
+- Average Buy Price: $120
+- Current Value: (Real-time)
+
+### Cardano (ADA)
+- Amount: 10,000 ADA
+- Average Buy Price: $0.45
+- Current Value: (Real-time)
+
+## Transaction History
+- [To be imported from Coinbase API]
+
+## Notes
+- Primary exchange for major holdings
+- DCA strategy active
+- API integration pending

@@ -1,0 +1,604 @@
+
+Positions
+
+Total value
+
+Today's price
+
+All time return
+
+AAVE
+AAVE
+
+Aave
+
+$851.11 CAD
+
+2.001443 coins
+
+$425.25 CAD
+
++1.01%
+
+$70.83 CAD
+
++9.08%
+
+APE
+APE
+
+ApeCoin
+
+$929.64 CAD
+
+1,065.789111 coins
+
+$0.8723 CAD
+
+−1.23%
+
+−$470.36 CAD
+
+−33.60%
+
+ARB
+ARB
+
+Arbitrum
+
+$2,770.86 CAD
+
+4,295.907931 coins
+
+$0.6450 CAD
+
+−1.72%
+
+−$735.56 CAD
+
+−20.98%
+
+ATOM
+ATOM
+
+Cosmos
+
+$1,209.86 CAD
+
+188.818651 coins
+
+$6.41 CAD
+
+−1.65%
+
+−$687.63 CAD
+
+−36.24%
+
+AVAX
+AVAX
+
+Avalanche
+
+$1,566.77 CAD
+
+47.868442 coins
+
+$32.73 CAD
+
+−1.40%
+
+−$283.33 CAD
+
+−15.31%
+
+BAT
+BAT
+
+Basic Attention Token
+
+$569.32 CAD
+
+2,639.876141 coins
+
+$0.2157 CAD
+
+−1.50%
+
+−$280.68 CAD
+
+−33.02%
+
+CELO
+CELO
+
+Celo
+
+$885.65 CAD
+
+1,767.814217 coins
+
+$0.5010 CAD
+
++1.05%
+
+−$364.35 CAD
+
+−29.15%
+
+COMP
+COMP
+
+Compound
+
+$672.66 CAD
+
+9.032843 coins
+
+$74.47 CAD
+
+−0.92%
+
+$34.58 CAD
+
++5.42%
+
+CRV
+CRV
+
+Curve
+
+$1,028.84 CAD
+
+763.005184 coins
+
+$1.35 CAD
+
+−0.41%
+
+$28.84 CAD
+
++2.88%
+
+DOT
+DOT
+
+Polkadot
+
+$7,085.49 CAD
+
+1,267.090835 coins
+
+$5.59 CAD
+
+−1.48%
+
+−$2,409.95 CAD
+
+−25.38%
+
+DYDX
+DYDX
+
+dYdX
+
+$489.17 CAD
+
+538.808465 coins
+
+$0.9079 CAD
+
+−1.99%
+
+−$359.31 CAD
+
+−42.35%
+
+EIGEN
+EIGEN
+
+Eigenlayer
+
+$618.56 CAD
+
+313.93066 coins
+
+$1.97 CAD
+
++0.03%
+
+$3.96 CAD
+
++0.64%
+
+ETHFI
+ETHFI
+
+EtherFi
+
+$1,581.33 CAD
+
+917.572217 coins
+
+$1.72 CAD
+
++0.52%
+
+$273.69 CAD
+
++20.93%
+
+FIL
+FIL
+
+Filecoin
+
+$1,612.71 CAD
+
+447.25078 coins
+
+$3.61 CAD
+
+−0.24%
+
+−$1,033.88 CAD
+
+−39.06%
+
+GALA
+GALA
+
+Gala
+
+$1,647.17 CAD
+
+67,642.758343 coins
+
+$0.02435 CAD
+
+−1.55%
+
+−$1,404.24 CAD
+
+−46.02%
+
+GRT
+GRT
+
+The Graph
+
+$620.41 CAD
+
+4,547.572849 coins
+
+$0.1364 CAD
+
+−1.24%
+
+−$383.00 CAD
+
+−38.17%
+
+HBAR
+HBAR
+
+Hedera
+
+$264.17 CAD
+
+738.104414 coins
+
+$0.3579 CAD
+
+−1.54%
+
+$87.82 CAD
+
++49.80%
+
+INJ
+INJ
+
+Injective Protocol
+
+$322.16 CAD
+
+16.190348 coins
+
+$19.90 CAD
+
+−0.08%
+
+$22.16 CAD
+
++7.39%
+
+LINK
+LINK
+
+Chainlink
+
+$932.21 CAD
+
+30.866391 coins
+
+$30.20 CAD
+
++2.01%
+
+$247.94 CAD
+
++36.23%
+
+MASK
+MASK
+
+Mask Network
+
+$1,043.31 CAD
+
+560.312552 coins
+
+$1.86 CAD
+
+−0.58%
+
+−$757.88 CAD
+
+−42.08%
+
+NEAR
+NEAR
+
+Near
+
+$929.96 CAD
+
+245.539367 coins
+
+$3.79 CAD
+
+−2.71%
+
+−$275.07 CAD
+
+−22.83%
+
+ONDO
+ONDO
+
+Ondo Finance
+
+$43.14 CAD
+
+30.338 coins
+
+$1.42 CAD
+
+−0.68%
+
+−$14.47 CAD
+
+−25.11%
+
+OP
+OP
+
+Optimism
+
+$1,457.31 CAD
+
+1,340.106188 coins
+
+$1.09 CAD
+
+−1.39%
+
+−$297.87 CAD
+
+−16.97%
+
+PNUT
+PNUT
+
+Peanut the Squirrel
+
+$417.80 CAD
+
+1,180.268736 coins
+
+$0.3540 CAD
+
++0.20%
+
+$17.80 CAD
+
++4.45%
+
+POL
+POL
+
+Polygon
+
+$711.17 CAD
+
+2,137.674936 coins
+
+$0.3327 CAD
+
+−2.59%
+
+−$1,138.83 CAD
+
+−61.56%
+
+RENDER
+RENDER
+
+RENDER
+
+$555.77 CAD
+
+102.47949 coins
+
+$5.42 CAD
+
+−1.29%
+
+−$94.23 CAD
+
+−14.50%
+
+S
+S
+
+Sonic
+
+$502.85 CAD
+
+1,171.840571 coins
+
+$0.4291 CAD
+
+−2.13%
+
+−$220.80 CAD
+
+−30.51%
+
+SAND
+SAND
+
+The Sandbox
+
+$1,066.21 CAD
+
+2,620.461368 coins
+
+$0.4069 CAD
+
+−1.43%
+
+−$385.85 CAD
+
+−26.57%
+
+SEI
+SEI
+
+Sei Network
+
+$982.14 CAD
+
+2,218.669948 coins
+
+$0.4427 CAD
+
+−1.67%
+
+$96.39 CAD
+
++10.88%
+
+SHIB
+SHIB
+
+Shiba Inu
+
+$488.15 CAD
+
+26,136,842.10951 coins
+
+$0.00001868 CAD
+
+−0.97%
+
+−$11.85 CAD
+
+−2.37%
+
+SKL
+SKL
+
+SKALE Network
+
+$1,049.54 CAD
+
+34,857.921093 coins
+
+$0.03011 CAD
+
+−2.36%
+
+−$47.75 CAD
+
+−4.35%
+
+SUSHI
+SUSHI
+
+SushiSwap
+
+$1,231.38 CAD
+
+1,007.650926 coins
+
+$1.22 CAD
+
+−0.71%
+
+−$336.99 CAD
+
+−21.49%
+
+USDC
+USDC
+
+USD Coin
+
+$3.71 CAD
+
+2.693716 coins
+
+$1.38 CAD
+
++0.80%
+
+−$0.2236 CAD
+
+−5.69%
+
+XLM
+XLM
+
+Stellar
+
+$522.03 CAD
+
+852.934935 coins
+
+$0.6120 CAD
+
++0.58%
+
+$22.03 CAD
+
++4.41%
+
+XRP
+XRP
+
+XRP Ledger
+
+$1,180.63 CAD
+
+267.60263 coins
+
+$4.41 CAD
+
++0.04%
+
+$41.01 CAD
+
++3.60%
+

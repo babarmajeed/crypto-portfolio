@@ -1,0 +1,46 @@
+# NDAX Portfolio
+
+## Holdings
+
+### Bitcoin (BTC)
+- Amount: 0.25 BTC
+- Average Buy Price: $38,500
+- Current Value: (Real-time)
+
+### Ethereum (ETH)
+- Amount: 3.5 ETH
+- Average Buy Price: $2,650
+- Current Value: (Real-time)
+
+### Binance Coin (BNB)
+- Amount: 15 BNB
+- Average Buy Price: $450
+- Current Value: (Real-time)
+
+### Polygon (MATIC)
+- Amount: 5,000 MATIC
+- Average Buy Price: $0.85
+- Current Value: (Real-time)
+
+### Chainlink (LINK)
+- Amount: 200 LINK
+- Average Buy Price: $15
+- Current Value: (Real-time)
+
+### Avalanche (AVAX)
+- Amount: 100 AVAX
+- Average Buy Price: $35
+- Current Value: (Real-time)
+
+## Canadian Dollar Holdings
+- CAD Balance: $5,000
+- Reserved for buying dips
+
+## Transaction History
+- [To be imported from NDAX API]
+
+## Notes
+- Canadian exchange for CAD pairs
+- Lower fees for Canadian banking
+- Staking rewards active on some holdings
+- API integration pending
