@@ -44,6 +44,8 @@ model User {
   loginSessions         LoginSession[]
   trustedDevices        TrustedDevice[]
   exchangeCredentials   UserExchangeCredential[]
+  encryptedCredentials  EncryptedApiCredential[]
+  keyAuditLogs          KeyAuditLog[]
 
   @@map("users")
 }
@@ -192,6 +194,7 @@ model Exchange {
   
   // Relations
   userCredentials   UserExchangeCredential[]
+  encryptedCredentials EncryptedApiCredential[]
   tradingPairs     TradingPair[]
   portfolios       Portfolio[]
   holdings         Holding[]
@@ -492,4 +495,299 @@ enum UserRole {
   BASIC
   PREMIUM
   ADMIN
+}
+
+// ==================================
+// SECURITY AND ENCRYPTION MODELS
+// ==================================
+
+// Master encryption keys for envelope encryption
+model MasterKey {
+  id                String            @id @default(cuid())
+  keyId             String            @unique @map("key_id") @db.VarChar(100)
+  version           Int               @default(1)
+  encryptedKey      String            @map("encrypted_key") @db.Text
+  keyDerivationSalt String            @map("key_derivation_salt") @db.VarChar(100)
+  algorithm         String            @default("AES-256-GCM") @db.VarChar(50)
+  keyType           MasterKeyType     @default(USER_DATA) @map("key_type")
+  status            MasterKeyStatus   @default(ACTIVE)
+  rotationPeriod    Int               @default(7776000) @map("rotation_period") // 90 days in seconds
+  lastRotated       DateTime?         @map("last_rotated")
+  nextRotation      DateTime          @map("next_rotation")
+  createdBy         String            @map("created_by")
+  isActive          Boolean           @default(true) @map("is_active")
+  hsmBacked         Boolean           @default(false) @map("hsm_backed")
+  metadata          Json              @default("{}")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  dataKeys          DataKey[]
+  rotationHistory   KeyRotationHistory[]
+  auditLogs         KeyAuditLog[]
+  
+  @@index([status, isActive])
+  @@index([nextRotation])
+  @@map("master_keys")
+}
+
+// Data encryption keys (envelope encryption)
+model DataKey {
+  id                    String       @id @default(cuid())
+  masterKeyId           String       @map("master_key_id")
+  dataKeyId             String       @unique @map("data_key_id") @db.VarChar(100)
+  encryptedDataKey      String       @map("encrypted_data_key") @db.Text
+  keyContext            Json         @default("{}") @map("key_context")
+  algorithm             String       @default("AES-256-GCM") @db.VarChar(50)
+  keyPurpose            DataKeyPurpose
+  associatedResourceId  String?      @map("associated_resource_id") @db.VarChar(100)
+  createdAt             DateTime     @default(now()) @map("created_at")
+  usageCount            Int          @default(0) @map("usage_count")
+  lastUsed              DateTime?    @map("last_used")
+  expiresAt             DateTime?    @map("expires_at")
+  isActive              Boolean      @default(true) @map("is_active")
+  
+  masterKey             MasterKey    @relation(fields: [masterKeyId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  apiCredentials        EncryptedApiCredential[]
+  
+  @@index([masterKeyId, isActive])
+  @@index([keyPurpose, associatedResourceId])
+  @@index([expiresAt])
+  @@map("data_keys")
+}
+
+// Enhanced encrypted API credentials with envelope encryption
+model EncryptedApiCredential {
+  id                        String                    @id @default(cuid())
+  userId                    String                    @map("user_id")
+  exchangeId                String                    @map("exchange_id")
+  dataKeyId                 String                    @map("data_key_id")
+  credentialId              String                    @unique @map("credential_id") @db.VarChar(100)
+  encryptedApiKey           String                    @map("encrypted_api_key") @db.Text
+  encryptedApiSecret        String                    @map("encrypted_api_secret") @db.Text
+  encryptedPassphrase       String?                   @map("encrypted_passphrase") @db.Text
+  apiKeyHash                String                    @map("api_key_hash") @db.VarChar(128)
+  encryptionMetadata        Json                      @map("encryption_metadata") @default("{}")
+  permissions               String[]                  @default(["read"])
+  permissionHash            String                    @map("permission_hash") @db.VarChar(128)
+  lastValidated             DateTime?                 @map("last_validated")
+  validationStatus          KeyValidationStatus       @default(PENDING) @map("validation_status")
+  validationError           String?                   @map("validation_error") @db.Text
+  riskScore                 Decimal                   @default(0) @map("risk_score") @db.Decimal(3, 2)
+  securityLevel             SecurityLevel             @default(STANDARD) @map("security_level")
+  ipWhitelist               String[]                  @default([]) @map("ip_whitelist")
+  geographicRestrictions    String[]                  @default([]) @map("geographic_restrictions")
+  usageMetrics              Json                      @default("{}") @map("usage_metrics")
+  lastSync                  DateTime?                 @map("last_sync")
+  syncStatus                String                    @default("pending") @map("sync_status")
+  errorMessage              String?                   @map("error_message") @db.Text
+  rotationPeriod            Int                       @default(2592000) @map("rotation_period") // 30 days
+  nextRotation              DateTime?                 @map("next_rotation")
+  isActive                  Boolean                   @default(true) @map("is_active")
+  sandboxMode               Boolean                   @default(false) @map("sandbox_mode")
+  emergencyRevoked          Boolean                   @default(false) @map("emergency_revoked")
+  revokedAt                 DateTime?                 @map("revoked_at")
+  revokedBy                 String?                   @map("revoked_by")
+  revocationReason          String?                   @map("revocation_reason") @db.Text
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
+  
+  // Relations
+  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchange                  Exchange                  @relation(fields: [exchangeId], references: [id])
+  dataKey                   DataKey                   @relation(fields: [dataKeyId], references: [id])
+  auditLogs                 KeyAuditLog[]
+  rotationHistory           KeyRotationHistory[]
+  
+  @@unique([userId, exchangeId])
+  @@index([userId, isActive])
+  @@index([validationStatus, nextRotation])
+  @@index([riskScore])
+  @@index([securityLevel])
+  @@map("encrypted_api_credentials")
+}
+
+// Comprehensive audit logging for all key operations
+model KeyAuditLog {
+  id                String                @id @default(cuid())
+  userId            String                @map("user_id")
+  masterKeyId       String?               @map("master_key_id")
+  credentialId      String?               @map("credential_id")
+  operation         KeyOperation
+  operationStatus   OperationStatus       @default(PENDING)
+  riskLevel         RiskLevel             @default(LOW) @map("risk_level")
+  riskFactors       String[]              @default([]) @map("risk_factors")
+  riskScore         Decimal               @default(0) @map("risk_score") @db.Decimal(3, 2)
+  ipAddress         String?               @map("ip_address") @db.VarChar(45)
+  userAgent         String?               @map("user_agent") @db.Text
+  deviceFingerprint String?               @map("device_fingerprint") @db.VarChar(500)
+  geolocation       Json?                 @map("geolocation")
+  sessionId         String?               @map("session_id") @db.VarChar(100)
+  exchangeId        String?               @map("exchange_id")
+  operationMetadata Json                  @default("{}") @map("operation_metadata")
+  beforeState       Json?                 @map("before_state")
+  afterState        Json?                 @map("after_state")
+  errorDetails      String?               @map("error_details") @db.Text
+  detectionRules    String[]              @default([]) @map("detection_rules")
+  anomalyScore      Decimal?              @map("anomaly_score") @db.Decimal(3, 2)
+  reviewRequired    Boolean               @default(false) @map("review_required")
+  reviewedBy        String?               @map("reviewed_by")
+  reviewedAt        DateTime?             @map("reviewed_at")
+  reviewNotes       String?               @map("review_notes") @db.Text
+  alertGenerated    Boolean               @default(false) @map("alert_generated")
+  complianceFlags   String[]              @default([]) @map("compliance_flags")
+  retentionPeriod   Int                   @default(31536000) @map("retention_period") // 1 year
+  compressedAt      DateTime?             @map("compressed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  
+  // Relations
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  masterKey         MasterKey?            @relation(fields: [masterKeyId], references: [id])
+  credential        EncryptedApiCredential? @relation(fields: [credentialId], references: [id])
+  
+  @@index([userId, createdAt])
+  @@index([operation, operationStatus])
+  @@index([riskLevel, createdAt])
+  @@index([anomalyScore, createdAt])
+  @@index([reviewRequired])
+  @@index([compressedAt])
+  @@map("key_audit_logs")
+}
+
+// Key rotation history and lifecycle management
+model KeyRotationHistory {
+  id                    String              @id @default(cuid())
+  masterKeyId           String?             @map("master_key_id")
+  credentialId          String?             @map("credential_id")
+  rotationType          RotationType
+  rotationReason        RotationReason      @default(SCHEDULED)
+  oldKeyVersion         Int?                @map("old_key_version")
+  newKeyVersion         Int?                @map("new_key_version")
+  oldKeyId              String?             @map("old_key_id") @db.VarChar(100)
+  newKeyId              String?             @map("new_key_id") @db.VarChar(100)
+  rotationStatus        RotationStatus      @default(INITIATED)
+  initiatedBy           String              @map("initiated_by")
+  completedBy           String?             @map("completed_by")
+  gracePeriodEnd        DateTime?           @map("grace_period_end")
+  backwardCompatible    Boolean             @default(true) @map("backward_compatible")
+  rollbackCapable       Boolean             @default(true) @map("rollback_capable")
+  rollbackDeadline      DateTime?           @map("rollback_deadline")
+  validationSteps       Json                @default("[]") @map("validation_steps")
+  migrationProgress     Decimal             @default(0) @map("migration_progress") @db.Decimal(3, 2)
+  affectedResources     String[]            @default([]) @map("affected_resources")
+  errorDetails          String?             @map("error_details") @db.Text
+  performanceMetrics    Json                @default("{}") @map("performance_metrics")
+  rollbackData          Json?               @map("rollback_data")
+  initiatedAt           DateTime            @default(now()) @map("initiated_at")
+  completedAt           DateTime?           @map("completed_at")
+  rolledBackAt          DateTime?           @map("rolled_back_at")
+  
+  // Relations
+  masterKey             MasterKey?          @relation(fields: [masterKeyId], references: [id])
+  credential            EncryptedApiCredential? @relation(fields: [credentialId], references: [id])
+  
+  @@index([masterKeyId, initiatedAt])
+  @@index([credentialId, initiatedAt])
+  @@index([rotationStatus, gracePeriodEnd])
+  @@index([rollbackCapable, rollbackDeadline])
+  @@map("key_rotation_history")
+}
+
+// Enums for security system
+enum MasterKeyType {
+  USER_DATA
+  SYSTEM
+  EXCHANGE_CREDENTIALS
+  AUDIT_LOGS
+}
+
+enum MasterKeyStatus {
+  ACTIVE
+  ROTATING
+  DEPRECATED
+  COMPROMISED
+  REVOKED
+}
+
+enum DataKeyPurpose {
+  API_CREDENTIALS
+  SENSITIVE_DATA
+  AUDIT_LOGS
+  BACKUP_DATA
+}
+
+enum KeyValidationStatus {
+  PENDING
+  VALID
+  INVALID
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum SecurityLevel {
+  BASIC
+  STANDARD
+  HIGH
+  CRITICAL
+}
+
+enum KeyOperation {
+  CREATE_MASTER_KEY
+  ROTATE_MASTER_KEY
+  CREATE_DATA_KEY
+  CREATE_CREDENTIAL
+  UPDATE_CREDENTIAL
+  VALIDATE_CREDENTIAL
+  ROTATE_CREDENTIAL
+  REVOKE_CREDENTIAL
+  ACCESS_CREDENTIAL
+  DELETE_CREDENTIAL
+  ENCRYPT_DATA
+  DECRYPT_DATA
+  BACKUP_KEYS
+  RESTORE_KEYS
+  HSM_OPERATION
+}
+
+enum OperationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RotationType {
+  MASTER_KEY
+  API_CREDENTIAL
+  DATA_KEY
+}
+
+enum RotationReason {
+  SCHEDULED
+  SECURITY_INCIDENT
+  COMPLIANCE_REQUIREMENT
+  MANUAL_REQUEST
+  SUSPICIOUS_ACTIVITY
+  KEY_COMPROMISE
+  POLICY_CHANGE
+}
+
+enum RotationStatus {
+  INITIATED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+  CANCELLED
 }
