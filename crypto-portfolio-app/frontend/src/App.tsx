@@ -9,6 +9,10 @@ import { Settings } from './pages/Settings'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import { ProfilePage } from './pages/user/ProfilePage'
+import { PreferencesPage } from './pages/user/PreferencesPage'
+import { SecurityPage } from './pages/user/SecurityPage'
+import { OnboardingPage } from './pages/user/OnboardingPage'
 
 function App() {
   return (
@@ -31,6 +35,10 @@ function App() {
                   <Route path="/portfolio" element={<Portfolio />} />
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/preferences" element={<PreferencesPage />} />
+                  <Route path="/security" element={<SecurityPage />} />
+                  <Route path="/onboarding" element={<OnboardingPage />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

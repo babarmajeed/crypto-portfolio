@@ -4,9 +4,14 @@ export interface User {
   firstName: string;
   lastName: string;
   isEmailVerified: boolean;
-  role: string;
+  role: 'ADMIN' | 'PREMIUM' | 'BASIC';
   is2FAEnabled: boolean;
-  profileImage?: string;
+  avatarUrl?: string;
+  timezone?: string;
+  language?: string;
+  country?: string;
+  phoneNumber?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }
