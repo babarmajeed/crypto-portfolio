@@ -20,6 +20,7 @@ import { WebSocketServer } from '@/websocket/server'
 import { cacheManager } from '@/services/cacheManager'
 import { redisService } from '@/services/redisService'
 import { createApiCompressionMiddleware } from '@/middleware/compressionMiddleware'
+import { jobProcessingService } from '@/services/jobProcessingService'
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
@@ -114,6 +115,14 @@ async function startServer() {
     await cacheManager.initialize()
     logger.info('✅ Cache system initialized successfully')
 
+    // Initialize job processing system
+    await jobProcessingService.initialize()
+    logger.info('✅ Job processing system initialized')
+    
+    // Start job processing
+    await jobProcessingService.start()
+    logger.info('✅ Job processing system started')
+
     // Test database connection
     await prisma.$connect()
     logger.info('✅ Database connected successfully')
@@ -148,6 +157,8 @@ async function startServer() {
       logger.info('   ✓ OAuth2 integration')
       logger.info('   ✓ Two-factor authentication')
       logger.info('   ✓ WebSocket real-time data')
+      logger.info('   ✓ Background job processing')
+      logger.info('   ✓ Queue monitoring and metrics')
     })
 
     // Set server timeout
@@ -158,7 +169,11 @@ async function startServer() {
       logger.info(`${signal} received, starting graceful shutdown...`)
       
       try {
-        // Shutdown WebSocket server first
+        // Shutdown job processing system first
+        await jobProcessingService.shutdown()
+        logger.info('📴 Job processing system shut down')
+        
+        // Shutdown WebSocket server
         await wsServer.shutdown()
         logger.info('📴 WebSocket server closed')
       } catch (error) {

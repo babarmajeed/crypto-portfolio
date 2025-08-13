@@ -6,6 +6,7 @@ import exchangeRoutes from './exchanges.routes'
 import marketRoutes from './market.routes'
 import analyticsRoutes from './analytics.routes'
 import { cacheRouter } from '../cache'
+import queueRoutes from '../queue.routes'
 
 const router = Router()
 
@@ -74,6 +75,7 @@ router.get('/', (req, res) => {
         '/market - Real-time market data and pricing',
         '/analytics - Portfolio analytics and insights',
         '/keys - API key management',
+        '/queues - Background job processing and monitoring',
         '/docs - API documentation'
       ],
       features: [
@@ -83,7 +85,9 @@ router.get('/', (req, res) => {
         'Advanced portfolio analytics',
         'Secure API key management',
         'Market data aggregation',
-        'Risk assessment and tracking'
+        'Risk assessment and tracking',
+        'Background job processing',
+        'Queue monitoring and metrics'
       ],
       documentation: '/api/v1/docs',
       status: 'operational',
@@ -170,5 +174,6 @@ router.use('/exchanges', exchangeRoutes)
 router.use('/market', marketRoutes)
 router.use('/analytics', analyticsRoutes)
 router.use('/cache', cacheRouter)
+router.use('/queues', queueRoutes)
 
 export default router
