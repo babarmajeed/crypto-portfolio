@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requestLoggingMiddleware, securityLoggingMiddleware } from '@/middleware/logging.middleware'
 import v1Routes from './v1'
+import rateLimitRoutes from './rateLimit.routes'
 
 const apiRouter = Router()
 
@@ -130,6 +131,9 @@ apiRouter.get('/', (req, res) => {
 
 // Mount API versions
 apiRouter.use('/v1', v1Routes)
+
+// Mount admin routes
+apiRouter.use('/admin/rate-limits', rateLimitRoutes)
 
 // Handle unknown API versions
 apiRouter.use('*', (req, res) => {

@@ -432,6 +432,16 @@ export class RateLimiterMiddleware {
       console.error('Error cleaning up rate limit entries:', error);
     }
   }
+
+  // Cleanup method for graceful shutdown
+  async shutdown(): Promise<void> {
+    try {
+      await rateLimitMonitor.stopMonitoring();
+      logger.info('Rate limiter middleware shutdown complete');
+    } catch (error) {
+      logger.error('Error during rate limiter shutdown:', error);
+    }
+  }
 }
 
 export const rateLimiterMiddleware = new RateLimiterMiddleware();

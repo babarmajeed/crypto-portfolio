@@ -1,226 +1,458 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-interface RateLimitConfig {
-  windowMs: number; // Time window in milliseconds
-  maxAttempts: number; // Maximum attempts allowed in the window
-}
+import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
+import { UserRole } from '@prisma/client';
+import { redisService } from './redisService';
+import { logger } from '../utils/logger';
+import {
+  RateLimitConfig,
+  RateLimitResult,
+  RateLimitMetrics,
+  BlacklistEntry,
+  UserTierConfig,
+  RateLimitHeaders,
+  RateLimiterOptions,
+} from '../types/rateLimit.types';
+import {
+  USER_TIER_LIMITS,
+  HOURLY_LIMITS,
+  DAILY_LIMITS,
+  BLACKLIST_CONFIG,
+  REDIS_KEYS,
+  DEFAULT_CONFIG,
+} from '../config/rateLimitConfig';
 
 class RateLimitService {
-  private readonly configs = {
-    login: { windowMs: 60 * 1000, maxAttempts: 10 }, // 10 attempts per minute
-    registration: { windowMs: 60 * 60 * 1000, maxAttempts: 5 }, // 5 registrations per hour
-    passwordReset: { windowMs: 60 * 60 * 1000, maxAttempts: 3 }, // 3 reset requests per hour
-    twoFactor: { windowMs: 60 * 1000, maxAttempts: 5 }, // 5 2FA attempts per minute
-    api: { windowMs: 60 * 1000, maxAttempts: 100 } // 100 API calls per minute
-  };
+  private limiters: Map<string, RateLimiterRedis | RateLimiterMemory> = new Map();
+  private blacklist: Set<string> = new Set();
+  private metrics: Map<string, RateLimitMetrics> = new Map();
+  private isInitialized = false;
 
-  async checkRate(key: string, type: keyof typeof this.configs): Promise<boolean> {
-    const config = this.configs[type];
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - config.windowMs);
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
 
-    // Clean up expired entries
-    await this.cleanupExpiredEntries();
+    try {
+      // Initialize rate limiters for different user tiers
+      await this.createLimiters();
+      
+      // Load blacklist from Redis
+      await this.loadBlacklist();
+      
+      // Start cleanup interval
+      this.startCleanupInterval();
+      
+      this.isInitialized = true;
+      logger.info('Rate limiting service initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize rate limiting service:', error);
+      throw error;
+    }
+  }
 
-    // Find existing entry
-    const existing = await prisma.rateLimitEntry.findUnique({
-      where: { key: `${type}:${key}` }
-    });
-
-    if (!existing) {
-      // Create new entry
-      await prisma.rateLimitEntry.create({
-        data: {
-          key: `${type}:${key}`,
-          attempts: 1,
-          expiresAt: new Date(now.getTime() + config.windowMs)
-        }
-      });
-      return true;
+  private async createLimiters(): Promise<void> {
+    const redisClient = redisService.getClient();
+    
+    // Create limiters for each user tier - minute limits
+    for (const [tier, config] of Object.entries(USER_TIER_LIMITS)) {
+      const limiterKey = `minute_${tier}`;
+      this.limiters.set(limiterKey, new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: `${REDIS_KEYS.RATE_LIMIT}:${limiterKey}`,
+        points: config.requests,
+        duration: Math.floor(config.windowMs / 1000),
+        blockDuration: Math.floor((config.blockDuration || 0) / 1000),
+        execEvenly: true,
+      }));
     }
 
-    // Check if entry is still valid
-    if (existing.expiresAt < now) {
-      // Reset expired entry
-      await prisma.rateLimitEntry.update({
-        where: { id: existing.id },
-        data: {
-          attempts: 1,
-          expiresAt: new Date(now.getTime() + config.windowMs)
-        }
-      });
-      return true;
+    // Create limiters for hourly limits
+    for (const [tier, config] of Object.entries(HOURLY_LIMITS)) {
+      const limiterKey = `hour_${tier}`;
+      this.limiters.set(limiterKey, new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: `${REDIS_KEYS.RATE_LIMIT}:${limiterKey}`,
+        points: config.requests,
+        duration: Math.floor(config.windowMs / 1000),
+        execEvenly: true,
+      }));
     }
 
-    // Check if limit exceeded
-    if (existing.attempts >= config.maxAttempts) {
+    // Create limiters for daily limits
+    for (const [tier, config] of Object.entries(DAILY_LIMITS)) {
+      const limiterKey = `day_${tier}`;
+      this.limiters.set(limiterKey, new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: `${REDIS_KEYS.RATE_LIMIT}:${limiterKey}`,
+        points: config.requests,
+        duration: Math.floor(config.windowMs / 1000),
+        execEvenly: true,
+      }));
+    }
+
+    // Fallback memory limiters when Redis is unavailable
+    if (DEFAULT_CONFIG.gracefulMode) {
+      for (const [tier, config] of Object.entries(USER_TIER_LIMITS)) {
+        const limiterKey = `memory_${tier}`;
+        this.limiters.set(limiterKey, new RateLimiterMemory({
+          points: config.requests,
+          duration: Math.floor(config.windowMs / 1000),
+          blockDuration: Math.floor((config.blockDuration || 0) / 1000),
+        }));
+      }
+    }
+  }
+
+  async checkRateLimit(
+    identifier: string,
+    userTier: UserRole | 'ANONYMOUS' | 'INTERNAL',
+    endpoint?: string
+  ): Promise<RateLimitResult> {
+    await this.ensureInitialized();
+
+    // Check if identifier is blacklisted
+    if (this.isBlacklisted(identifier)) {
+      const blacklistEntry = await this.getBlacklistEntry(identifier);
+      return {
+        allowed: false,
+        totalRequests: 0,
+        remainingRequests: 0,
+        retryAfter: blacklistEntry ? Math.floor((blacklistEntry.expiresAt.getTime() - Date.now()) / 1000) : 3600,
+        resetTime: blacklistEntry?.expiresAt || new Date(Date.now() + 3600000),
+        userTier: userTier.toString(),
+      };
+    }
+
+    try {
+      // Check all time windows (minute, hour, day)
+      const results = await Promise.all([
+        this.checkLimiter(`minute_${userTier}`, identifier),
+        this.checkLimiter(`hour_${userTier}`, identifier),
+        this.checkLimiter(`day_${userTier}`, identifier),
+      ]);
+
+      // Find the most restrictive result
+      const restrictiveResult = results.find(result => !result.allowed) || results[0];
+      
+      // Update metrics
+      await this.updateMetrics(identifier, userTier.toString(), endpoint, restrictiveResult.allowed);
+      
+      // Check for blacklist conditions
+      if (!restrictiveResult.allowed) {
+        await this.checkBlacklistConditions(identifier);
+      }
+
+      return {
+        ...restrictiveResult,
+        userTier: userTier.toString(),
+      };
+    } catch (error) {
+      logger.error('Rate limit check failed:', error);
+      
+      // Graceful fallback
+      if (DEFAULT_CONFIG.gracefulMode) {
+        try {
+          return await this.checkLimiter(`memory_${userTier}`, identifier);
+        } catch (fallbackError) {
+          logger.error('Fallback rate limiter also failed:', fallbackError);
+          // Allow request on complete failure
+          return {
+            allowed: true,
+            totalRequests: 1,
+            remainingRequests: 999,
+            resetTime: new Date(Date.now() + 60000),
+            userTier: userTier.toString(),
+          };
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async checkLimiter(limiterKey: string, identifier: string): Promise<RateLimitResult> {
+    const limiter = this.limiters.get(limiterKey);
+    if (!limiter) {
+      throw new Error(`Limiter ${limiterKey} not found`);
+    }
+
+    try {
+      const result = await limiter.consume(identifier);
+      return {
+        allowed: true,
+        totalRequests: result.totalHits,
+        remainingRequests: result.remainingPoints || 0,
+        resetTime: new Date(Date.now() + (result.msBeforeNext || 0)),
+      };
+    } catch (rejRes: any) {
+      return {
+        allowed: false,
+        totalRequests: rejRes.totalHits || 0,
+        remainingRequests: rejRes.remainingPoints || 0,
+        retryAfter: Math.floor((rejRes.msBeforeNext || 0) / 1000),
+        resetTime: new Date(Date.now() + (rejRes.msBeforeNext || 0)),
+      };
+    }
+  }
+
+  async getUserTier(userId?: string, role?: UserRole): Promise<UserRole | 'ANONYMOUS' | 'INTERNAL'> {
+    if (!userId) return 'ANONYMOUS';
+    if (role) return role;
+    
+    // Default to BASIC if no role specified
+    return UserRole.BASIC;
+  }
+
+  async addToBlacklist(identifier: string, reason: string, duration: number = BLACKLIST_CONFIG.durations.medium): Promise<void> {
+    if (!BLACKLIST_CONFIG.enabled) return;
+    
+    const expiresAt = new Date(Date.now() + duration);
+    const blacklistEntry: BlacklistEntry = {
+      identifier,
+      reason,
+      expiresAt,
+      createdAt: new Date(),
+      requestCount: 0,
+    };
+
+    this.blacklist.add(identifier);
+    await redisService.set(
+      `${REDIS_KEYS.BLACKLIST}:${identifier}`,
+      blacklistEntry,
+      { ttl: Math.floor(duration / 1000) }
+    );
+
+    logger.warn(`Added ${identifier} to blacklist`, { reason, duration });
+  }
+
+  async removeFromBlacklist(identifier: string): Promise<void> {
+    this.blacklist.delete(identifier);
+    await redisService.del(`${REDIS_KEYS.BLACKLIST}:${identifier}`);
+    logger.info(`Removed ${identifier} from blacklist`);
+  }
+
+  private isBlacklisted(identifier: string): boolean {
+    // Check whitelist first
+    if (BLACKLIST_CONFIG.whitelist.includes(identifier)) {
       return false;
     }
-
-    // Increment attempts
-    await prisma.rateLimitEntry.update({
-      where: { id: existing.id },
-      data: {
-        attempts: existing.attempts + 1
-      }
-    });
-
-    return true;
+    return this.blacklist.has(identifier);
   }
 
-  async checkLoginRate(ipAddress: string): Promise<void> {
-    const allowed = await this.checkRate(ipAddress, 'login');
-    if (!allowed) {
-      throw new Error('Too many login attempts. Please try again later.');
-    }
+  private async getBlacklistEntry(identifier: string): Promise<BlacklistEntry | null> {
+    return await redisService.get<BlacklistEntry>(`${REDIS_KEYS.BLACKLIST}:${identifier}`);
   }
 
-  async checkRegistrationRate(ipAddress: string): Promise<void> {
-    const allowed = await this.checkRate(ipAddress, 'registration');
-    if (!allowed) {
-      throw new Error('Too many registration attempts. Please try again later.');
-    }
-  }
-
-  async checkPasswordResetRate(ipAddress: string): Promise<void> {
-    const allowed = await this.checkRate(ipAddress, 'passwordReset');
-    if (!allowed) {
-      throw new Error('Too many password reset requests. Please try again later.');
-    }
-  }
-
-  async checkTwoFactorRate(userId: string): Promise<void> {
-    const allowed = await this.checkRate(userId, 'twoFactor');
-    if (!allowed) {
-      throw new Error('Too many two-factor authentication attempts. Please try again later.');
-    }
-  }
-
-  async checkApiRate(identifier: string): Promise<void> {
-    const allowed = await this.checkRate(identifier, 'api');
-    if (!allowed) {
-      throw new Error('API rate limit exceeded. Please try again later.');
-    }
-  }
-
-  async recordFailedLogin(ipAddress: string): Promise<void> {
-    // This is handled by checkLoginRate, but we can add additional tracking here
-    const key = `failed_login:${ipAddress}`;
-    const now = new Date();
-    
+  private async loadBlacklist(): Promise<void> {
     try {
-      const existing = await prisma.rateLimitEntry.findUnique({
-        where: { key }
-      });
-
-      if (existing && existing.expiresAt > now) {
-        await prisma.rateLimitEntry.update({
-          where: { id: existing.id },
-          data: { attempts: existing.attempts + 1 }
-        });
-      } else {
-        await prisma.rateLimitEntry.upsert({
-          where: { key },
-          create: {
-            key,
-            attempts: 1,
-            expiresAt: new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
-          },
-          update: {
-            attempts: 1,
-            expiresAt: new Date(now.getTime() + 60 * 60 * 1000)
-          }
-        });
+      const keys = await redisService.keys(`${REDIS_KEYS.BLACKLIST}:*`);
+      for (const key of keys) {
+        const identifier = key.replace(`${REDIS_KEYS.BLACKLIST}:`, '');
+        const entry = await redisService.get<BlacklistEntry>(key);
+        if (entry && entry.expiresAt > new Date()) {
+          this.blacklist.add(identifier);
+        }
       }
+      logger.info(`Loaded ${this.blacklist.size} blacklisted identifiers`);
     } catch (error) {
-      console.error('Error recording failed login:', error);
+      logger.error('Failed to load blacklist:', error);
     }
   }
 
-  async getFailedLoginCount(ipAddress: string): Promise<number> {
-    const key = `failed_login:${ipAddress}`;
-    const entry = await prisma.rateLimitEntry.findUnique({
-      where: { key }
-    });
-
-    if (!entry || entry.expiresAt < new Date()) {
-      return 0;
+  async resetRateLimit(identifier: string, userTier: UserRole | 'ANONYMOUS' | 'INTERNAL'): Promise<void> {
+    try {
+      const limiterKeys = [`minute_${userTier}`, `hour_${userTier}`, `day_${userTier}`];
+      
+      for (const limiterKey of limiterKeys) {
+        const limiter = this.limiters.get(limiterKey);
+        if (limiter && 'delete' in limiter) {
+          await (limiter as any).delete(identifier);
+        }
+      }
+      
+      logger.info(`Reset rate limits for ${identifier} (${userTier})`);
+    } catch (error) {
+      logger.error('Failed to reset rate limits:', error);
     }
-
-    return entry.attempts;
   }
 
-  async resetRate(key: string, type: keyof typeof this.configs): Promise<void> {
-    await prisma.rateLimitEntry.delete({
-      where: { key: `${type}:${key}` }
-    }).catch(() => {
-      // Ignore if entry doesn't exist
-    });
-  }
-
-  async getRemainingAttempts(key: string, type: keyof typeof this.configs): Promise<number> {
-    const config = this.configs[type];
-    const entry = await prisma.rateLimitEntry.findUnique({
-      where: { key: `${type}:${key}` }
-    });
-
-    if (!entry || entry.expiresAt < new Date()) {
-      return config.maxAttempts;
+  async getRateLimitHeaders(identifier: string, userTier: UserRole | 'ANONYMOUS' | 'INTERNAL'): Promise<RateLimitHeaders> {
+    await this.ensureInitialized();
+    
+    const config = USER_TIER_LIMITS[userTier as keyof UserTierConfig];
+    const limiter = this.limiters.get(`minute_${userTier}`);
+    
+    if (!limiter || !config) {
+      return {
+        'X-RateLimit-Limit': '100',
+        'X-RateLimit-Remaining': '99',
+        'X-RateLimit-Reset': new Date(Date.now() + 60000).toISOString(),
+        'X-RateLimit-Tier': userTier.toString(),
+      };
     }
 
-    return Math.max(0, config.maxAttempts - entry.attempts);
+    try {
+      const result = await (limiter as any).get(identifier);
+      const remaining = Math.max(0, config.requests - (result?.totalHits || 0));
+      const resetTime = new Date(Date.now() + (result?.msBeforeNext || 60000));
+
+      const headers: RateLimitHeaders = {
+        'X-RateLimit-Limit': config.requests.toString(),
+        'X-RateLimit-Remaining': remaining.toString(),
+        'X-RateLimit-Reset': resetTime.toISOString(),
+        'X-RateLimit-Tier': userTier.toString(),
+      };
+
+      if (result?.msBeforeNext) {
+        headers['X-RateLimit-RetryAfter'] = Math.ceil(result.msBeforeNext / 1000).toString();
+      }
+
+      return headers;
+    } catch (error) {
+      logger.error('Failed to get rate limit headers:', error);
+      return {
+        'X-RateLimit-Limit': config.requests.toString(),
+        'X-RateLimit-Remaining': config.requests.toString(),
+        'X-RateLimit-Reset': new Date(Date.now() + config.windowMs).toISOString(),
+        'X-RateLimit-Tier': userTier.toString(),
+      };
+    }
   }
 
-  async getTimeUntilReset(key: string, type: keyof typeof this.configs): Promise<number> {
-    const entry = await prisma.rateLimitEntry.findUnique({
-      where: { key: `${type}:${key}` }
-    });
+  private async updateMetrics(
+    identifier: string,
+    userTier: string,
+    endpoint?: string,
+    allowed: boolean = true
+  ): Promise<void> {
+    const key = `${identifier}:${userTier}:${endpoint || 'unknown'}`;
+    const existing = this.metrics.get(key) || {
+      identifier,
+      totalRequests: 0,
+      allowedRequests: 0,
+      blockedRequests: 0,
+      averageResponseTime: 0,
+      lastRequest: new Date(),
+      userTier,
+      endpoint,
+    };
 
-    if (!entry || entry.expiresAt < new Date()) {
-      return 0;
+    existing.totalRequests++;
+    if (allowed) {
+      existing.allowedRequests++;
+    } else {
+      existing.blockedRequests++;
+    }
+    existing.lastRequest = new Date();
+
+    this.metrics.set(key, existing);
+
+    // Store in Redis for persistence
+    await redisService.set(
+      `${REDIS_KEYS.MONITORING}:${key}`,
+      existing,
+      { ttl: DEFAULT_CONFIG.monitoringRetention / 1000 }
+    );
+  }
+
+  private async checkBlacklistConditions(identifier: string): Promise<void> {
+    if (!BLACKLIST_CONFIG.enabled || BLACKLIST_CONFIG.whitelist.includes(identifier)) {
+      return;
     }
 
-    return Math.max(0, entry.expiresAt.getTime() - Date.now());
+    const metrics = Array.from(this.metrics.values())
+      .filter(m => m.identifier === identifier);
+    
+    if (metrics.length === 0) return;
+
+    const totalRequests = metrics.reduce((sum, m) => sum + m.totalRequests, 0);
+    const blockedRequests = metrics.reduce((sum, m) => sum + m.blockedRequests, 0);
+    const errorRate = (blockedRequests / totalRequests) * 100;
+    
+    // Check thresholds
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    const recentMetrics = metrics.filter(m => m.lastRequest.getTime() > oneMinuteAgo);
+    const recentRequests = recentMetrics.reduce((sum, m) => sum + m.totalRequests, 0);
+
+    let duration = 0;
+    let reason = '';
+
+    if (recentRequests > BLACKLIST_CONFIG.thresholds.requestsPerMinute) {
+      duration = BLACKLIST_CONFIG.durations.heavy;
+      reason = `Excessive requests: ${recentRequests}/min`;
+    } else if (errorRate > BLACKLIST_CONFIG.thresholds.errorRate) {
+      duration = BLACKLIST_CONFIG.durations.medium;
+      reason = `High error rate: ${errorRate.toFixed(1)}%`;
+    } else if (blockedRequests > BLACKLIST_CONFIG.thresholds.consecutiveBlocks) {
+      duration = BLACKLIST_CONFIG.durations.light;
+      reason = `Consecutive blocks: ${blockedRequests}`;
+    }
+
+    if (duration > 0) {
+      await this.addToBlacklist(identifier, reason, duration);
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+  }
+
+  private startCleanupInterval(): void {
+    setInterval(async () => {
+      try {
+        await this.cleanupExpiredEntries();
+      } catch (error) {
+        logger.error('Cleanup interval error:', error);
+      }
+    }, DEFAULT_CONFIG.cleanupInterval);
   }
 
   private async cleanupExpiredEntries(): Promise<void> {
     try {
-      await prisma.rateLimitEntry.deleteMany({
-        where: {
-          expiresAt: { lt: new Date() }
+      // Clean up blacklist
+      const blacklistKeys = await redisService.keys(`${REDIS_KEYS.BLACKLIST}:*`);
+      for (const key of blacklistKeys) {
+        const entry = await redisService.get<BlacklistEntry>(key);
+        if (entry && entry.expiresAt <= new Date()) {
+          const identifier = key.replace(`${REDIS_KEYS.BLACKLIST}:`, '');
+          await this.removeFromBlacklist(identifier);
         }
-      });
+      }
+
+      // Clean up old metrics
+      const cutoffTime = Date.now() - DEFAULT_CONFIG.monitoringRetention;
+      for (const [key, metrics] of this.metrics.entries()) {
+        if (metrics.lastRequest.getTime() < cutoffTime) {
+          this.metrics.delete(key);
+        }
+      }
+
+      logger.debug('Rate limit cleanup completed');
     } catch (error) {
-      console.error('Error cleaning up expired rate limit entries:', error);
+      logger.error('Error during rate limit cleanup:', error);
     }
   }
 
-  // Middleware function for Express
-  createMiddleware(type: keyof typeof this.configs, keyExtractor: (req: any) => string) {
-    return async (req: any, res: any, next: any) => {
-      try {
-        const key = keyExtractor(req);
-        const allowed = await this.checkRate(key, type);
-        
-        if (!allowed) {
-          const remaining = await this.getRemainingAttempts(key, type);
-          const timeUntilReset = await this.getTimeUntilReset(key, type);
-          
-          return res.status(429).json({
-            error: 'Rate limit exceeded',
-            retryAfter: Math.ceil(timeUntilReset / 1000),
-            remaining: remaining
-          });
-        }
-        
-        next();
-      } catch (error) {
-        console.error('Rate limiting error:', error);
-        next(); // Allow request to proceed on rate limiting errors
-      }
-    };
+  async getMetrics(identifier?: string): Promise<RateLimitMetrics[]> {
+    if (identifier) {
+      return Array.from(this.metrics.values())
+        .filter(m => m.identifier === identifier);
+    }
+    return Array.from(this.metrics.values());
+  }
+
+  async getBlacklistedIdentifiers(): Promise<string[]> {
+    return Array.from(this.blacklist);
+  }
+
+  async isServiceHealthy(): Promise<boolean> {
+    try {
+      await this.ensureInitialized();
+      const healthCheck = await redisService.healthCheck();
+      return healthCheck.status === 'healthy';
+    } catch (error) {
+      logger.error('Rate limit service health check failed:', error);
+      return false;
+    }
   }
 }
 

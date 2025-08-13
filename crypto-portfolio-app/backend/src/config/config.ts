@@ -34,6 +34,8 @@ const configSchema = z.object({
   rateLimit: z.object({
     windowMs: z.coerce.number().default(15 * 60 * 1000), // 15 minutes
     max: z.coerce.number().default(100), // requests per window
+    enabled: z.boolean().default(true),
+    whitelist: z.string().optional(),
   }),
 })
 
@@ -68,6 +70,8 @@ const rawConfig = {
   rateLimit: {
     windowMs: process.env.RATE_LIMIT_WINDOW_MS,
     max: process.env.RATE_LIMIT_MAX,
+    enabled: process.env.RATE_LIMIT_ENABLED,
+    whitelist: process.env.RATE_LIMIT_WHITELIST,
   },
 }
 
