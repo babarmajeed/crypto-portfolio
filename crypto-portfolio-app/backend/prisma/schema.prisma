@@ -11,176 +11,485 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  firstName String
-  lastName  String
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  firstName             String
+  lastName              String
+  password              String
+  isEmailVerified       Boolean  @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+  lastLogin             DateTime?
+  failedLoginAttempts   Int      @default(0)
+  accountLockedUntil    DateTime?
+  role                  UserRole @default(BASIC)
+  isActive              Boolean  @default(true)
+  isTwoFactorEnabled    Boolean  @default(false)
+  twoFactorSecret       String?
+  backupCodes           String[] @default([])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   // Relationships
-  portfolios Portfolio[]
-  priceAlerts PriceAlert[]
-  preferences UserPreferences?
+  portfolios            Portfolio[]
+  transactions          Transaction[]
+  priceAlerts           PriceAlert[]
+  profile               UserProfile?
+  preferences           UserPreferences?
+  refreshTokens         RefreshToken[]
+  oauthAccounts         OAuthAccount[]
+  auditLogs             AuditLog[]
+  loginSessions         LoginSession[]
+  trustedDevices        TrustedDevice[]
+  exchangeCredentials   UserExchangeCredential[]
 
   @@map("users")
 }
 
-model UserPreferences {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Preferences
-  currency String @default("USD")
-  timezone String @default("UTC")
-  
-  // Notifications
-  emailNotifications     Boolean @default(true)
-  pushNotifications      Boolean @default(true)
-  priceAlerts            Boolean @default(true)
-  portfolioUpdates       Boolean @default(true)
-  
-  // Privacy
-  hideBalances     Boolean @default(false)
-  sharePortfolio   Boolean @default(false)
-
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  deviceInfo String?
+  ipAddress String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
+  @@map("refresh_tokens")
+}
+
+model OAuthAccount {
+  id           String @id @default(cuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String
+  providerAccountId String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  tokenType    String?
+  scope        String?
+  idToken      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model LoginSession {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId  String    @unique
+  ipAddress  String
+  userAgent  String?
+  deviceInfo String?
+  loginAt    DateTime  @default(now())
+  logoutAt   DateTime?
+  isActive   Boolean   @default(true)
+  expiresAt  DateTime
+
+  @@map("login_sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  action     String   @db.VarChar(100)
+  resource   String?  @db.VarChar(100)
+  resourceId String?  @map("resource_id") @db.VarChar(100)
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("audit_logs")
+}
+
+model TrustedDevice {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  deviceFingerprint String   @map("device_fingerprint") @db.VarChar(500)
+  deviceName        String?  @map("device_name") @db.VarChar(200)
+  lastSeen          DateTime @default(now()) @map("last_seen")
+  trustedAt         DateTime @default(now()) @map("trusted_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, deviceFingerprint])
+  @@map("trusted_devices")
+}
+
+model RateLimitEntry {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  attempts  Int      @default(1)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("rate_limit_entries")
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  firstName String?  @map("first_name") @db.VarChar(100)
+  lastName  String?  @map("last_name") @db.VarChar(100)
+  avatarUrl String?  @map("avatar_url") @db.VarChar(500)
+  timezone  String   @default("UTC") @db.VarChar(50)
+  language  String   @default("en") @db.VarChar(10)
+  country   String?  @db.VarChar(5)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_profiles")
+}
+
+model UserPreferences {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  baseCurrency    String   @default("USD") @map("base_currency") @db.VarChar(10)
+  theme           String   @default("light") @db.VarChar(20)
+  dashboardLayout Json     @default("{}") @map("dashboard_layout")
+  notifications   Json     @default("{\"email\": true, \"push\": true, \"sms\": false}")
+  privacySettings Json     @default("{\"portfolio_public\": false}") @map("privacy_settings")
+  riskTolerance   String   @default("moderate") @map("risk_tolerance") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@map("user_preferences")
 }
 
-model Portfolio {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Exchange and Trading Infrastructure
+model Exchange {
+  id                String             @id @default(cuid())
+  name              String             @unique
+  displayName       String             @map("display_name")
+  websiteUrl        String?            @map("website_url")
+  apiBaseUrl        String             @map("api_base_url")
+  websocketUrl      String?            @map("websocket_url")
+  rateLimitPerMinute Int               @default(1200) @map("rate_limit_per_minute")
+  requiresKyc       Boolean            @default(false) @map("requires_kyc")
+  supportedCountries String[]          @map("supported_countries")
+  tradingFees       Json               @default("{}") @map("trading_fees")
+  status            ExchangeStatus     @default(ACTIVE)
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  
+  // Relations
+  userCredentials   UserExchangeCredential[]
+  tradingPairs     TradingPair[]
+  portfolios       Portfolio[]
+  holdings         Holding[]
+  transactions     Transaction[]
+  
+  @@map("exchanges")
+}
 
+model UserExchangeCredential {
+  id                 String       @id @default(cuid())
+  userId             String       @map("user_id")
+  exchangeId         String       @map("exchange_id")
+  apiKeyEncrypted    String       @map("api_key_encrypted")
+  apiSecretEncrypted String       @map("api_secret_encrypted")
+  passphraseEncrypted String?     @map("passphrase_encrypted")
+  sandboxMode        Boolean      @default(false) @map("sandbox_mode")
+  permissions        String[]     @default(["read"])
+  lastSync           DateTime?    @map("last_sync")
+  syncStatus         String       @default("pending") @map("sync_status")
+  errorMessage       String?      @map("error_message")
+  isActive           Boolean      @default(true) @map("is_active")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchange Exchange @relation(fields: [exchangeId], references: [id])
+  
+  @@unique([userId, exchangeId])
+  @@map("user_exchange_credentials")
+}
+
+// Cryptocurrency and Market Data
+model Cryptocurrency {
+  id                String            @id @default(cuid())
+  symbol            String            @unique
+  name              String
+  coingeckoId       String?           @map("coingecko_id")
+  coinmarketcapId   Int?              @map("coinmarketcap_id")
+  description       String?
+  logoUrl           String?           @map("logo_url")
+  websiteUrl        String?           @map("website_url")
+  whitepaperUrl     String?           @map("whitepaper_url")
+  maxSupply         Decimal?          @map("max_supply") @db.Decimal(30, 8)
+  circulatingSupply Decimal?          @map("circulating_supply") @db.Decimal(30, 8)
+  marketCapRank     Int?              @map("market_cap_rank")
+  isActive          Boolean           @default(true) @map("is_active")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  baseTradingPairs  TradingPair[]     @relation("BaseCurrency")
+  quoteTradingPairs TradingPair[]     @relation("QuoteCurrency")
+  holdings          Holding[]
+  transactions      Transaction[]
+  priceAlerts       PriceAlert[]
+  priceHistory      PriceHistory[]
+  currentPrices     CurrentPrice[]
+  
+  @@map("cryptocurrencies")
+}
+
+model TradingPair {
+  id                String           @id @default(cuid())
+  exchangeId        String           @map("exchange_id")
+  baseCurrencyId    String           @map("base_currency_id")
+  quoteCurrencyId   String           @map("quote_currency_id")
+  symbol            String
+  minOrderSize      Decimal?         @map("min_order_size") @db.Decimal(30, 8)
+  maxOrderSize      Decimal?         @map("max_order_size") @db.Decimal(30, 8)
+  pricePrecision    Int              @default(8) @map("price_precision")
+  quantityPrecision Int              @default(8) @map("quantity_precision")
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  
+  exchange         Exchange         @relation(fields: [exchangeId], references: [id])
+  baseCurrency     Cryptocurrency   @relation("BaseCurrency", fields: [baseCurrencyId], references: [id])
+  quoteCurrency    Cryptocurrency   @relation("QuoteCurrency", fields: [quoteCurrencyId], references: [id])
+  priceHistory     PriceHistory[]
+  currentPrice     CurrentPrice?
+  
+  @@unique([exchangeId, symbol])
+  @@map("trading_pairs")
+}
+
+// Price Data Models
+model PriceHistory {
+  id              String          @id @default(cuid())
+  tradingPairId   String?         @map("trading_pair_id")
+  cryptocurrencyId String?        @map("cryptocurrency_id")
+  price           Decimal         @db.Decimal(30, 8)
+  volume24h       Decimal?        @map("volume_24h") @db.Decimal(30, 8)
+  marketCap       Decimal?        @map("market_cap") @db.Decimal(30, 8)
+  change24h       Decimal?        @map("change_24h") @db.Decimal(10, 4)
+  timestamp       DateTime
+  source          String
+  
+  tradingPair     TradingPair?    @relation(fields: [tradingPairId], references: [id])
+  cryptocurrency  Cryptocurrency? @relation(fields: [cryptocurrencyId], references: [id])
+  
+  @@index([tradingPairId, timestamp])
+  @@index([cryptocurrencyId, timestamp])
+  @@map("price_history")
+}
+
+model CurrentPrice {
+  id              String       @id @default(cuid())
+  tradingPairId   String       @unique @map("trading_pair_id")
+  cryptocurrencyId String?     @map("cryptocurrency_id")
+  price           Decimal      @db.Decimal(30, 8)
+  change24h       Decimal?     @map("change_24h") @db.Decimal(10, 4)
+  volume24h       Decimal?     @map("volume_24h") @db.Decimal(30, 8)
+  marketCap       Decimal?     @map("market_cap") @db.Decimal(30, 8)
+  lastUpdated     DateTime     @default(now()) @map("last_updated")
+  
+  tradingPair     TradingPair  @relation(fields: [tradingPairId], references: [id])
+  cryptocurrency  Cryptocurrency? @relation(fields: [cryptocurrencyId], references: [id])
+  
+  @@map("current_prices")
+}
+
+// Portfolio Management
+model Portfolio {
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  exchangeId  String?       @map("exchange_id")
   name        String
   description String?
-  isDefault   Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  holdings     Holding[]
-  transactions Transaction[]
-
+  type        PortfolioType @default(MAIN)
+  isDefault   Boolean       @default(false) @map("is_default")
+  isActive    Boolean       @default(true) @map("is_active")
+  totalValue  Decimal?      @default(0) @map("total_value") @db.Decimal(30, 8)
+  totalCost   Decimal?      @default(0) @map("total_cost") @db.Decimal(30, 8)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchange           Exchange?             @relation(fields: [exchangeId], references: [id])
+  holdings           Holding[]
+  transactions       Transaction[]
+  portfolioSnapshots PortfolioSnapshot[]
+  performanceMetrics PerformanceMetric[]
+  
   @@map("portfolios")
 }
 
-model Asset {
-  id       String @id @default(cuid())
-  symbol   String @unique
-  name     String
-  imageUrl String?
-
-  // Market data (updated periodically)
-  currentPrice       Decimal @default(0)
-  marketCap          Decimal @default(0)
-  volume24h          Decimal @default(0)
-  priceChange24h     Decimal @default(0)
-  priceChangePercent24h Decimal @default(0)
-  circulatingSupply  Decimal @default(0)
-  totalSupply        Decimal?
-  maxSupply          Decimal?
-
-  // External IDs
-  coingeckoId String?
-  
-  lastUpdated DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relationships
-  holdings    Holding[]
-  transactions Transaction[]
-  priceAlerts PriceAlert[]
-  priceHistory PriceHistory[]
-
-  @@map("assets")
-}
-
 model Holding {
-  id          String @id @default(cuid())
-  portfolioId String
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  assetId     String
-  asset       Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  amount       Decimal @default(0)
-  averagePrice Decimal @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([portfolioId, assetId])
+  id               String         @id @default(cuid())
+  portfolioId      String         @map("portfolio_id")
+  cryptocurrencyId String         @map("cryptocurrency_id")
+  exchangeId       String?        @map("exchange_id")
+  quantity         Decimal        @default(0) @db.Decimal(30, 8)
+  averageCost      Decimal?       @map("average_cost") @db.Decimal(30, 8)
+  totalCost        Decimal?       @map("total_cost") @db.Decimal(30, 8)
+  currentValue     Decimal?       @map("current_value") @db.Decimal(30, 8)
+  unrealizedPnl    Decimal?       @map("unrealized_pnl") @db.Decimal(30, 8)
+  lastSync         DateTime       @default(now()) @map("last_sync")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  
+  portfolio      Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  cryptocurrency Cryptocurrency @relation(fields: [cryptocurrencyId], references: [id])
+  exchange       Exchange?      @relation(fields: [exchangeId], references: [id])
+  
+  @@unique([portfolioId, cryptocurrencyId, exchangeId])
   @@map("holdings")
 }
 
 model Transaction {
-  id          String @id @default(cuid())
-  portfolioId String
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  assetId     String
-  asset       Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  type       TransactionType
-  amount     Decimal
-  price      Decimal
-  totalValue Decimal
-  fee        Decimal @default(0)
+  id                     String             @id @default(cuid())
+  userId                 String             @map("user_id")
+  portfolioId            String             @map("portfolio_id")
+  exchangeId             String?            @map("exchange_id")
+  exchangeTransactionId  String?            @map("exchange_transaction_id")
+  type                   TransactionType
+  status                 TransactionStatus  @default(COMPLETED)
+  cryptocurrencyId       String             @map("cryptocurrency_id")
+  quantity               Decimal            @db.Decimal(30, 8)
+  price                  Decimal?           @db.Decimal(30, 8)
+  fee                    Decimal            @default(0) @db.Decimal(30, 8)
+  feeCurrencyId          String?            @map("fee_currency_id")
+  totalValue             Decimal?           @map("total_value") @db.Decimal(30, 8)
+  notes                  String?
+  transactionHash        String?            @map("transaction_hash")
+  blockNumber            BigInt?            @map("block_number")
+  executedAt             DateTime           @map("executed_at")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
   
-  exchange   String?
-  notes      String?
-  timestamp  DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio      Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  exchange       Exchange?      @relation(fields: [exchangeId], references: [id])
+  cryptocurrency Cryptocurrency @relation(fields: [cryptocurrencyId], references: [id])
+  
+  @@index([userId, executedAt])
+  @@index([portfolioId, executedAt])
   @@map("transactions")
 }
 
 model PriceAlert {
-  id      String @id @default(cuid())
-  userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  type        AlertType
-  targetPrice Decimal
-  isActive    Boolean   @default(true)
-  triggeredAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id               String         @id @default(cuid())
+  userId           String         @map("user_id")
+  cryptocurrencyId String         @map("cryptocurrency_id")
+  type             AlertType
+  targetPrice      Decimal        @map("target_price") @db.Decimal(30, 8)
+  currentPrice     Decimal?       @map("current_price") @db.Decimal(30, 8)
+  isActive         Boolean        @default(true) @map("is_active")
+  triggeredAt      DateTime?      @map("triggered_at")
+  notificationSent Boolean        @default(false) @map("notification_sent")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cryptocurrency Cryptocurrency @relation(fields: [cryptocurrencyId], references: [id])
+  
   @@map("price_alerts")
 }
 
-model PriceHistory {
-  id      String @id @default(cuid())
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+// Analytics and Performance
+model PortfolioSnapshot {
+  id              String    @id @default(cuid())
+  portfolioId     String    @map("portfolio_id")
+  totalValue      Decimal   @map("total_value") @db.Decimal(30, 8)
+  totalCost       Decimal   @map("total_cost") @db.Decimal(30, 8)
+  unrealizedPnl   Decimal   @map("unrealized_pnl") @db.Decimal(30, 8)
+  realizedPnl     Decimal   @map("realized_pnl") @db.Decimal(30, 8)
+  roiPercentage   Decimal?  @map("roi_percentage") @db.Decimal(10, 4)
+  snapshotDate    DateTime  @map("snapshot_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@unique([portfolioId, snapshotDate])
+  @@map("portfolio_snapshots")
+}
 
-  price     Decimal
-  volume    Decimal
-  marketCap Decimal
-  timestamp DateTime
+model PerformanceMetric {
+  id                String    @id @default(cuid())
+  portfolioId       String    @map("portfolio_id")
+  period            String    // '1d', '7d', '30d', '1y', 'all'
+  returnPercentage  Decimal?  @map("return_percentage") @db.Decimal(10, 4)
+  volatility        Decimal?  @db.Decimal(10, 4)
+  sharpeRatio       Decimal?  @map("sharpe_ratio") @db.Decimal(10, 4)
+  maxDrawdown       Decimal?  @map("max_drawdown") @db.Decimal(10, 4)
+  alpha             Decimal?  @db.Decimal(10, 4)
+  beta              Decimal?  @db.Decimal(10, 4)
+  calculatedAt      DateTime  @default(now()) @map("calculated_at")
+  
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@unique([portfolioId, period])
+  @@map("performance_metrics")
+}
 
-  @@unique([assetId, timestamp])
-  @@map("price_history")
+// Enums
+enum ExchangeStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  RATE_LIMITED
+}
+
+enum PortfolioType {
+  MAIN
+  TRADING
+  SAVINGS
+  DEFI
 }
 
 enum TransactionType {
   BUY
   SELL
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  STAKING_REWARD
+  AIRDROP
+  FORK
+  MINING
+  FEE
+  DIVIDEND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum AlertType {
   ABOVE
   BELOW
+  PERCENTAGE_CHANGE
+}
+
+enum UserRole {
+  BASIC
+  PREMIUM
+  ADMIN
 }

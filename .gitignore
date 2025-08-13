@@ -1,5 +1,5 @@
 
-# Claude Flow generated files
+# Claude Flow and Claude Code generated files
 .claude/settings.local.json
 .mcp.json
 claude-flow.config.json
@@ -23,3 +23,56 @@ claude-flow
 claude-flow.bat
 claude-flow.ps1
 hive-mind-prompt-*.txt
+
+# Claude Flow metrics and performance data
+.claude-flow/
+*/.claude-flow/
+**/.claude-flow/
+
+# Development and build files
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs
+*.log
+
+# Build outputs
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# TypeScript
+*.tsbuildinfo
+
+# Temporary folders
+tmp/
+temp/

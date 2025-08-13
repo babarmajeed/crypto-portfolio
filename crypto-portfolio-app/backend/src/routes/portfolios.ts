@@ -1,46 +1,49 @@
-import { Router } from 'express'
+import { Router } from 'express';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { portfolioController } from '../controllers/portfolioController';
 
-const portfoliosRouter = Router()
+const portfoliosRouter = Router();
 
-// GET /api/v1/portfolios
-portfoliosRouter.get('/', (_req, res) => {
-  res.status(200).json({
-    success: true,
-    data: [],
-    message: 'No portfolios found',
-  })
-})
+// All portfolio routes require authentication
+portfoliosRouter.use(authMiddleware);
 
-// GET /api/v1/portfolios/:id
-portfoliosRouter.get('/:id', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Get portfolio endpoint not implemented yet',
-  })
-})
+// GET /api/v1/portfolios - Get user's portfolios
+portfoliosRouter.get('/', portfolioController.getUserPortfolios);
 
-// POST /api/v1/portfolios
-portfoliosRouter.post('/', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Create portfolio endpoint not implemented yet',
-  })
-})
+// POST /api/v1/portfolios - Create new portfolio
+portfoliosRouter.post('/', portfolioController.createPortfolio);
 
-// PUT /api/v1/portfolios/:id
-portfoliosRouter.put('/:id', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Update portfolio endpoint not implemented yet',
-  })
-})
+// POST /api/v1/portfolios/sync - Sync all user portfolios
+portfoliosRouter.post('/sync', portfolioController.syncUserPortfolios);
 
-// DELETE /api/v1/portfolios/:id
-portfoliosRouter.delete('/:id', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Delete portfolio endpoint not implemented yet',
-  })
-})
+// GET /api/v1/portfolios/:portfolioId - Get specific portfolio
+portfoliosRouter.get('/:portfolioId', portfolioController.getPortfolioById);
 
-export { portfoliosRouter }
+// PUT /api/v1/portfolios/:portfolioId - Update portfolio
+portfoliosRouter.put('/:portfolioId', portfolioController.updatePortfolio);
+
+// DELETE /api/v1/portfolios/:portfolioId - Delete portfolio
+portfoliosRouter.delete('/:portfolioId', portfolioController.deletePortfolio);
+
+// POST /api/v1/portfolios/:portfolioId/default - Set portfolio as default
+portfoliosRouter.post('/:portfolioId/default', portfolioController.setAsDefault);
+
+// GET /api/v1/portfolios/:portfolioId/analytics - Get portfolio analytics
+portfoliosRouter.get('/:portfolioId/analytics', portfolioController.getPortfolioAnalytics);
+
+// POST /api/v1/portfolios/:portfolioId/update-values - Update portfolio values
+portfoliosRouter.post('/:portfolioId/update-values', portfolioController.updatePortfolioValues);
+
+// GET /api/v1/portfolios/:portfolioId/holdings - Get portfolio holdings
+portfoliosRouter.get('/:portfolioId/holdings', portfolioController.getPortfolioHoldings);
+
+// POST /api/v1/portfolios/:portfolioId/snapshot - Create portfolio snapshot
+portfoliosRouter.post('/:portfolioId/snapshot', portfolioController.createSnapshot);
+
+// GET /api/v1/portfolios/:portfolioId/snapshots - Get portfolio snapshot history
+portfoliosRouter.get('/:portfolioId/snapshots', portfolioController.getSnapshotHistory);
+
+// GET /api/v1/portfolios/:portfolioId/performance - Get performance metrics
+portfoliosRouter.get('/:portfolioId/performance', portfolioController.getPerformanceMetrics);
+
+export { portfoliosRouter };
