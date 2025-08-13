@@ -17,6 +17,9 @@ import { healthRouter } from '@/routes/health'
 import { apiRouter } from '@/routes/api'
 import { setupSwagger } from '@/docs/swagger.config'
 import { WebSocketServer } from '@/websocket/server'
+import { cacheManager } from '@/services/cacheManager'
+import { redisService } from '@/services/redisService'
+import { createApiCompressionMiddleware } from '@/middleware/compressionMiddleware'
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
@@ -45,8 +48,12 @@ app.use(session({
 app.use(passport.initialize())
 app.use(passport.session())
 
-// Compression
-app.use(compression())
+// Enhanced compression with cache optimization
+app.use(createApiCompressionMiddleware({
+  threshold: 1024, // 1KB
+  level: 6,
+  algorithm: 'gzip'
+}))
 
 // Logging
 app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }))
@@ -99,6 +106,14 @@ const PORT = config.port || 3001
 
 async function startServer() {
   try {
+    // Initialize Redis connection
+    await redisService.connect()
+    logger.info('✅ Redis connected successfully')
+
+    // Initialize cache system
+    await cacheManager.initialize()
+    logger.info('✅ Cache system initialized successfully')
+
     // Test database connection
     await prisma.$connect()
     logger.info('✅ Database connected successfully')
@@ -154,6 +169,14 @@ async function startServer() {
         logger.info('📴 HTTP server closed')
         
         try {
+          // Shutdown cache manager
+          await cacheManager.shutdown()
+          logger.info('📴 Cache system closed')
+
+          // Disconnect Redis
+          await redisService.disconnect()
+          logger.info('📴 Redis disconnected')
+
           await prisma.$disconnect()
           logger.info('📴 Database connections closed')
           

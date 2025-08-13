@@ -5,6 +5,7 @@ import portfolioRoutes from './portfolios.routes'
 import exchangeRoutes from './exchanges.routes'
 import marketRoutes from './market.routes'
 import analyticsRoutes from './analytics.routes'
+import { cacheRouter } from '../cache'
 
 const router = Router()
 
@@ -168,5 +169,6 @@ router.use('/portfolios', portfolioRoutes)
 router.use('/exchanges', exchangeRoutes)
 router.use('/market', marketRoutes)
 router.use('/analytics', analyticsRoutes)
+router.use('/cache', cacheRouter)
 
 export default router
