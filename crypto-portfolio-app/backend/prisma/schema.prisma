@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  portfolios Portfolio[]
+  priceAlerts PriceAlert[]
+  preferences UserPreferences?
+
+  @@map("users")
+}
+
+model UserPreferences {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Preferences
+  currency String @default("USD")
+  timezone String @default("UTC")
+  
+  // Notifications
+  emailNotifications     Boolean @default(true)
+  pushNotifications      Boolean @default(true)
+  priceAlerts            Boolean @default(true)
+  portfolioUpdates       Boolean @default(true)
+  
+  // Privacy
+  hideBalances     Boolean @default(false)
+  sharePortfolio   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model Portfolio {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  isDefault   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  holdings     Holding[]
+  transactions Transaction[]
+
+  @@map("portfolios")
+}
+
+model Asset {
+  id       String @id @default(cuid())
+  symbol   String @unique
+  name     String
+  imageUrl String?
+
+  // Market data (updated periodically)
+  currentPrice       Decimal @default(0)
+  marketCap          Decimal @default(0)
+  volume24h          Decimal @default(0)
+  priceChange24h     Decimal @default(0)
+  priceChangePercent24h Decimal @default(0)
+  circulatingSupply  Decimal @default(0)
+  totalSupply        Decimal?
+  maxSupply          Decimal?
+
+  // External IDs
+  coingeckoId String?
+  
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  holdings    Holding[]
+  transactions Transaction[]
+  priceAlerts PriceAlert[]
+  priceHistory PriceHistory[]
+
+  @@map("assets")
+}
+
+model Holding {
+  id          String @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  assetId     String
+  asset       Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  amount       Decimal @default(0)
+  averagePrice Decimal @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([portfolioId, assetId])
+  @@map("holdings")
+}
+
+model Transaction {
+  id          String @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  assetId     String
+  asset       Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  type       TransactionType
+  amount     Decimal
+  price      Decimal
+  totalValue Decimal
+  fee        Decimal @default(0)
+  
+  exchange   String?
+  notes      String?
+  timestamp  DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("transactions")
+}
+
+model PriceAlert {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  type        AlertType
+  targetPrice Decimal
+  isActive    Boolean   @default(true)
+  triggeredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("price_alerts")
+}
+
+model PriceHistory {
+  id      String @id @default(cuid())
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  price     Decimal
+  volume    Decimal
+  marketCap Decimal
+  timestamp DateTime
+
+  @@unique([assetId, timestamp])
+  @@map("price_history")
+}
+
+enum TransactionType {
+  BUY
+  SELL
+}
+
+enum AlertType {
+  ABOVE
+  BELOW
+}
