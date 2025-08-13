@@ -14,6 +14,7 @@ import { securityMiddleware } from '@/middleware/securityMiddleware'
 import { rateLimiterMiddleware } from '@/middleware/rateLimiterMiddleware'
 import { healthRouter } from '@/routes/health'
 import { apiRouter } from '@/routes/api'
+import { setupSwagger } from '@/docs/swagger.config'
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
@@ -60,6 +61,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Apply general API rate limiting
 app.use('/api', rateLimiterMiddleware.apiLimiter)
+
+// Setup Swagger documentation
+setupSwagger(app)
 
 // Health check endpoints
 app.use('/health', healthRouter)
