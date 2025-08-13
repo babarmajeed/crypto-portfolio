@@ -491,6 +491,69 @@ export class RedisService {
       return null;
     }
   }
+
+  /**
+   * Additional Redis operations needed by WebSocket rate limiting
+   */
+  async incr(key: string): Promise<number> {
+    if (!this.isConnected) return 1;
+
+    try {
+      return await this.client.incr(key);
+    } catch (error) {
+      logger.error(`Error incrementing key ${key}:`, error);
+      return 1;
+    }
+  }
+
+  async decr(key: string): Promise<number> {
+    if (!this.isConnected) return 0;
+
+    try {
+      return await this.client.decr(key);
+    } catch (error) {
+      logger.error(`Error decrementing key ${key}:`, error);
+      return 0;
+    }
+  }
+
+  async setex(key: string, seconds: number, value: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    try {
+      await this.client.setex(key, seconds, value);
+      return true;
+    } catch (error) {
+      logger.error(`Error setting key ${key} with expiry:`, error);
+      return false;
+    }
+  }
+
+  async keys(pattern: string): Promise<string[]> {
+    if (!this.isConnected) return [];
+
+    try {
+      return await this.client.keys(pattern);
+    } catch (error) {
+      logger.error(`Error getting keys with pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
+  async ping(): Promise<string> {
+    if (!this.isConnected) throw new Error('Redis not connected');
+
+    try {
+      return await this.client.ping();
+    } catch (error) {
+      logger.error('Error pinging Redis:', error);
+      throw error;
+    }
+  }
+
+  getClient(): Redis {
+    return this.client;
+  }
 }
 
 // Singleton instance

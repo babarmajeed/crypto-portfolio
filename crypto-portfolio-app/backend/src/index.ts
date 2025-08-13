@@ -5,6 +5,7 @@ import compression from 'compression'
 import morgan from 'morgan'
 import session from 'express-session'
 import passport from 'passport'
+import { createServer } from 'http'
 import { PrismaClient } from '@prisma/client'
 import { config } from '@/config/config'
 import { logger } from '@/utils/logger'
@@ -15,6 +16,7 @@ import { rateLimiterMiddleware } from '@/middleware/rateLimiterMiddleware'
 import { healthRouter } from '@/routes/health'
 import { apiRouter } from '@/routes/api'
 import { setupSwagger } from '@/docs/swagger.config'
+import { WebSocketServer } from '@/websocket/server'
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
@@ -101,10 +103,18 @@ async function startServer() {
     await prisma.$connect()
     logger.info('✅ Database connected successfully')
 
-    const server = app.listen(PORT, () => {
+    // Create HTTP server
+    const httpServer = createServer(app)
+    
+    // Initialize WebSocket server
+    const wsServer = new WebSocketServer(httpServer)
+    logger.info('✅ WebSocket server initialized')
+
+    httpServer.listen(PORT, () => {
       logger.info(`🚀 Crypto Portfolio Backend Server started`)
       logger.info(`📍 Environment: ${config.nodeEnv}`)
       logger.info(`🌐 Server URL: http://localhost:${PORT}`)
+      logger.info(`🔌 WebSocket URL: ws://localhost:${PORT}`)
       logger.info(`📋 API Documentation: http://localhost:${PORT}/api/v1`)
       logger.info(`💚 Health Check: http://localhost:${PORT}/health`)
       logger.info(`🔒 Security Info: http://localhost:${PORT}/security`)
@@ -122,16 +132,25 @@ async function startServer() {
       logger.info('   ✓ Session management')
       logger.info('   ✓ OAuth2 integration')
       logger.info('   ✓ Two-factor authentication')
+      logger.info('   ✓ WebSocket real-time data')
     })
 
     // Set server timeout
-    server.timeout = 30000 // 30 seconds
+    httpServer.timeout = 30000 // 30 seconds
 
     // Graceful shutdown handlers
     const gracefulShutdown = async (signal: string) => {
       logger.info(`${signal} received, starting graceful shutdown...`)
       
-      server.close(async () => {
+      try {
+        // Shutdown WebSocket server first
+        await wsServer.shutdown()
+        logger.info('📴 WebSocket server closed')
+      } catch (error) {
+        logger.error('❌ Error closing WebSocket server:', error)
+      }
+      
+      httpServer.close(async () => {
         logger.info('📴 HTTP server closed')
         
         try {
