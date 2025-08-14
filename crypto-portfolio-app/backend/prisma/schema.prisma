@@ -193,7 +193,6 @@ model Exchange {
   updatedAt         DateTime           @updatedAt @map("updated_at")
   
   // Relations
-  userCredentials   UserExchangeCredential[]
   encryptedCredentials EncryptedApiCredential[]
   tradingPairs     TradingPair[]
   portfolios       Portfolio[]
@@ -206,10 +205,10 @@ model Exchange {
 model UserExchangeCredential {
   id                 String       @id @default(cuid())
   userId             String       @map("user_id")
-  exchangeId         String       @map("exchange_id")
-  apiKeyEncrypted    String       @map("api_key_encrypted")
-  apiSecretEncrypted String       @map("api_secret_encrypted")
-  passphraseEncrypted String?     @map("passphrase_encrypted")
+  exchange           String       @default("binance")
+  apiKey             String       @map("api_key")
+  apiSecret          String       @map("api_secret")
+  passphrase         String?      @map("passphrase")
   sandboxMode        Boolean      @default(false) @map("sandbox_mode")
   permissions        String[]     @default(["read"])
   lastSync           DateTime?    @map("last_sync")
@@ -220,9 +219,8 @@ model UserExchangeCredential {
   updatedAt          DateTime     @updatedAt @map("updated_at")
   
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exchange Exchange @relation(fields: [exchangeId], references: [id])
   
-  @@unique([userId, exchangeId])
+  @@unique([userId, exchange])
   @@map("user_exchange_credentials")
 }
 
@@ -562,7 +560,7 @@ model DataKey {
 model EncryptedApiCredential {
   id                        String                    @id @default(cuid())
   userId                    String                    @map("user_id")
-  exchangeId                String                    @map("exchange_id")
+  exchangeId                String?                   @map("exchange_id")
   dataKeyId                 String                    @map("data_key_id")
   credentialId              String                    @unique @map("credential_id") @db.VarChar(100)
   encryptedApiKey           String                    @map("encrypted_api_key") @db.Text
@@ -596,7 +594,7 @@ model EncryptedApiCredential {
   
   // Relations
   user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exchange                  Exchange                  @relation(fields: [exchangeId], references: [id])
+  exchange                  Exchange?                 @relation(fields: [exchangeId], references: [id])
   dataKey                   DataKey                   @relation(fields: [dataKeyId], references: [id])
   auditLogs                 KeyAuditLog[]
   rotationHistory           KeyRotationHistory[]
