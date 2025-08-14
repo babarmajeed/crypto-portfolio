@@ -2,6 +2,7 @@ import { Router } from 'express'
 import exchangeRoutes from '../exchanges'
 import { orderExecutionRoutes } from '../orderExecution.routes'
 import { portfolioSyncRoutes } from '../portfolioSync.routes'
+import { feeCalculationRoutes } from '../feeCalculation.routes'
 
 const router = Router()
 
@@ -13,6 +14,9 @@ router.use('/', orderExecutionRoutes)
 
 // Mount portfolio sync routes
 router.use('/portfolio', portfolioSyncRoutes)
+
+// Mount fee calculation routes
+router.use('/fees', feeCalculationRoutes)
 
 // Exchange status endpoint
 router.get('/status', async (req, res) => {
