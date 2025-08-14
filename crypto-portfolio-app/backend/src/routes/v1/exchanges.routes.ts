@@ -1,10 +1,14 @@
 import { Router } from 'express'
 import exchangeRoutes from '../exchanges'
+import { orderExecutionRoutes } from '../orderExecution.routes'
 
 const router = Router()
 
 // Mount all exchange routes  
 router.use('/', exchangeRoutes)
+
+// Mount order execution routes
+router.use('/', orderExecutionRoutes)
 
 // Exchange status endpoint
 router.get('/status', async (req, res) => {
