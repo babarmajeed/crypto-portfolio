@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Crypto Portfolio Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .offline-container {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+            margin: 1rem;
+        }
+
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: #f1f5f9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+
+        p {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-list {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .feature-list h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .feature-list ul {
+            list-style: none;
+        }
+
+        .feature-list li {
+            padding: 0.25rem 0;
+            color: #64748b;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .feature-list li:before {
+            content: '✓';
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .retry-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+
+        .retry-button:hover {
+            background: #2563eb;
+        }
+
+        .retry-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 1rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .status-dot.online {
+            background: #10b981;
+        }
+
+        @media (max-width: 480px) {
+            .offline-container {
+                padding: 1.5rem;
+                margin: 0.5rem;
+            }
+
+            h1 {
+                font-size: 1.25rem;
+            }
+
+            .offline-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .checking {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">
+            📡
+        </div>
+        
+        <h1>You're Offline</h1>
+        <p>No internet connection detected. Some features are still available while offline.</p>
+        
+        <div class="feature-list">
+            <h3>Available Offline</h3>
+            <ul>
+                <li>View cached portfolio data</li>
+                <li>Browse recent transactions</li>
+                <li>Access saved market data</li>
+                <li>View price alerts</li>
+            </ul>
+        </div>
+        
+        <button class="retry-button" onclick="checkConnection()">
+            <span id="button-text">Check Connection</span>
+        </button>
+        
+        <div class="status-indicator">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Offline</span>
+        </div>
+    </div>
+
+    <script>
+        let isChecking = false;
+
+        function updateStatus(isOnline) {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            const button = document.querySelector('.retry-button');
+            const buttonText = document.getElementById('button-text');
+
+            if (isOnline) {
+                statusDot.classList.add('online');
+                statusText.textContent = 'Online';
+                buttonText.textContent = 'Reload Page';
+                button.onclick = () => window.location.reload();
+            } else {
+                statusDot.classList.remove('online');
+                statusText.textContent = 'Offline';
+                buttonText.textContent = 'Check Connection';
+                button.onclick = checkConnection;
+            }
+        }
+
+        async function checkConnection() {
+            if (isChecking) return;
+            
+            isChecking = true;
+            const button = document.querySelector('.retry-button');
+            const buttonText = document.getElementById('button-text');
+            const originalText = buttonText.textContent;
+            
+            button.disabled = true;
+            button.classList.add('checking');
+            buttonText.textContent = 'Checking...';
+
+            try {
+                // Try to fetch a small resource
+                const response = await fetch('/manifest.json', {
+                    cache: 'no-cache',
+                    mode: 'no-cors'
+                });
+                
+                // If we get here, we're online
+                updateStatus(true);
+            } catch (error) {
+                // Still offline
+                updateStatus(false);
+                
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.classList.remove('checking');
+                    buttonText.textContent = originalText;
+                }, 1000);
+            }
+            
+            isChecking = false;
+        }
+
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            updateStatus(true);
+        });
+
+        window.addEventListener('offline', () => {
+            updateStatus(false);
+        });
+
+        // Check initial status
+        updateStatus(navigator.onLine);
+
+        // Auto-check connection periodically
+        setInterval(() => {
+            if (!isChecking && !navigator.onLine) {
+                checkConnection();
+            }
+        }, 30000); // Check every 30 seconds
+
+        // Try to register service worker if available
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('Service Worker registered');
+                })
+                .catch(error => {
+                    console.log('Service Worker registration failed');
+                });
+        }
+    </script>
+</body>
+</html>
