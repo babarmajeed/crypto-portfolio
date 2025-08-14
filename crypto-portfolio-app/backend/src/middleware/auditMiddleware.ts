@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthenticatedRequest } from './authMiddleware';
+import { v4 as uuidv4 } from 'uuid';
+import { AuditLogEntry, SecurityEvent } from '@/types/monitoring.types';
+import { loggingService } from '@/services/loggingService';
+import { analyticsService } from '@/services/analyticsService';
+import { complianceSettings } from '@/config/monitoring.config';
 
 const prisma = new PrismaClient();
 
@@ -224,6 +229,325 @@ export class AuditMiddleware {
     };
   }
 
+  // Enhanced compliance audit logging
+  static complianceAudit(
+    regulation: string,
+    requirement: string,
+    dataClassification: 'public' | 'internal' | 'confidential' | 'restricted'
+  ) {
+    return async (req: AuditableRequest, res: Response, next: NextFunction) => {
+      if (!req.user || (req.auditInfo && req.auditInfo.skipAudit)) {
+        next();
+        return;
+      }
+
+      try {
+        const auditEntry: AuditLogEntry = {
+          id: uuidv4(),
+          timestamp: new Date(),
+          userId: req.user.userId,
+          sessionId: req.sessionID,
+          ipAddress: this.getClientIP(req),
+          userAgent: req.headers['user-agent'],
+          action: req.auditInfo?.action || this.inferActionFromRequest(req),
+          resource: req.auditInfo?.resource || this.extractResourceFromPath(req.originalUrl),
+          resourceId: req.auditInfo?.resourceId || req.params.id,
+          oldValues: req.auditInfo?.oldValues,
+          newValues: ['POST', 'PUT', 'PATCH'].includes(req.method) ? this.sanitizeForCompliance(req.body) : undefined,
+          result: res.statusCode >= 400 ? 'failure' : 'success',
+          severity: this.determineAuditSeverity(req, dataClassification),
+          compliance: {
+            regulation,
+            requirement,
+            dataClassification
+          },
+          metadata: {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            duration: req.startTime ? Date.now() - req.startTime : undefined
+          }
+        };
+
+        // Store in database
+        await this.storeComplianceAuditEntry(auditEntry);
+
+        // Log to monitoring system
+        loggingService.logInfo('Compliance audit entry created', {
+          userId: auditEntry.userId,
+          metadata: {
+            regulation,
+            requirement,
+            dataClassification,
+            action: auditEntry.action,
+            resource: auditEntry.resource
+          },
+          tags: ['compliance', 'audit', regulation.toLowerCase(), dataClassification]
+        });
+
+        // Track as analytics event
+        await analyticsService.trackEvent(
+          'security',
+          'compliance',
+          'audit_logged',
+          regulation,
+          undefined,
+          req.user.userId,
+          req.sessionID,
+          {
+            regulation,
+            requirement,
+            dataClassification,
+            action: auditEntry.action,
+            resource: auditEntry.resource
+          }
+        );
+
+      } catch (error) {
+        loggingService.logError('Compliance audit logging failed', error as Error, {
+          userId: req.user?.userId,
+          metadata: { regulation, requirement, dataClassification }
+        });
+      }
+
+      next();
+    };
+  }
+
+  // Financial data access audit (PCI-DSS, SOX compliance)
+  static financialDataAudit() {
+    return this.complianceAudit('PCI-DSS', 'Data Access Logging', 'confidential');
+  }
+
+  // Personal data access audit (GDPR compliance)
+  static personalDataAudit() {
+    return this.complianceAudit('GDPR', 'Personal Data Processing', 'restricted');
+  }
+
+  // Data retention compliance
+  static dataRetentionAudit(retentionPeriod: string) {
+    return async (req: AuditableRequest, res: Response, next: NextFunction) => {
+      if (req.method === 'DELETE' && req.user) {
+        try {
+          await this.logDataRetention(req.user.userId, {
+            action: 'DATA_DELETION',
+            resource: req.auditInfo?.resource || this.extractResourceFromPath(req.originalUrl),
+            resourceId: req.params.id,
+            retentionPeriod,
+            reason: req.body?.reason || 'User requested deletion',
+            ipAddress: this.getClientIP(req),
+            userAgent: req.headers['user-agent']
+          });
+        } catch (error) {
+          loggingService.logError('Data retention audit failed', error as Error);
+        }
+      }
+      next();
+    };
+  }
+
+  // Enhanced security event logging
+  static enhancedSecurityEvent(
+    eventType: SecurityEvent['type'],
+    severity: SecurityEvent['severity'],
+    riskScore?: number
+  ) {
+    return async (req: AuditableRequest, res: Response, next: NextFunction) => {
+      try {
+        const securityEvent: SecurityEvent = {
+          id: uuidv4(),
+          timestamp: new Date(),
+          type: eventType,
+          severity,
+          userId: req.user?.userId,
+          ipAddress: this.getClientIP(req),
+          userAgent: req.headers['user-agent'],
+          location: await this.getLocationFromIP(this.getClientIP(req)),
+          details: {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            ...req.body
+          },
+          riskScore: riskScore || this.calculateRiskScore(req, eventType),
+          blocked: res.statusCode === 403 || res.statusCode === 429,
+          source: 'audit-middleware'
+        };
+
+        // Store security event
+        await this.storeSecurityEvent(securityEvent);
+
+        // Alert if high risk
+        if (securityEvent.riskScore > 70) {
+          loggingService.logError(`High-risk security event: ${eventType}`, undefined, {
+            userId: securityEvent.userId,
+            metadata: securityEvent,
+            tags: ['security', 'high-risk', eventType]
+          });
+        }
+
+      } catch (error) {
+        loggingService.logError('Enhanced security event logging failed', error as Error);
+      }
+
+      next();
+    };
+  }
+
+  // Private helper methods for enhanced functionality
+  private static async storeComplianceAuditEntry(entry: AuditLogEntry): Promise<void> {
+    try {
+      await prisma.auditLog.create({
+        data: {
+          id: entry.id,
+          userId: entry.userId || '',
+          action: entry.action,
+          resource: entry.resource,
+          resourceId: entry.resourceId,
+          oldValues: entry.oldValues,
+          newValues: entry.newValues,
+          ipAddress: entry.ipAddress,
+          userAgent: entry.userAgent,
+          result: entry.result,
+          reason: entry.reason,
+          metadata: entry.metadata,
+          severity: entry.severity,
+          createdAt: entry.timestamp
+        }
+      });
+
+      // Store compliance-specific data if enabled
+      if (complianceSettings.gdpr.enabled || complianceSettings.pciDss.enabled) {
+        // Additional compliance storage logic would go here
+      }
+    } catch (error) {
+      throw new Error(`Failed to store compliance audit entry: ${error}`);
+    }
+  }
+
+  private static async storeSecurityEvent(event: SecurityEvent): Promise<void> {
+    try {
+      // Store in audit log with security classification
+      await prisma.auditLog.create({
+        data: {
+          id: event.id,
+          userId: event.userId || '',
+          action: `SECURITY_${event.type.toUpperCase()}`,
+          resource: 'Security Event',
+          ipAddress: event.ipAddress,
+          userAgent: event.userAgent,
+          metadata: {
+            ...event.details,
+            severity: event.severity,
+            riskScore: event.riskScore,
+            blocked: event.blocked,
+            location: event.location
+          },
+          severity: event.severity,
+          createdAt: event.timestamp
+        }
+      });
+    } catch (error) {
+      throw new Error(`Failed to store security event: ${error}`);
+    }
+  }
+
+  private static async logDataRetention(userId: string, data: any): Promise<void> {
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: data.action,
+        resource: data.resource,
+        resourceId: data.resourceId,
+        metadata: {
+          retentionPeriod: data.retentionPeriod,
+          reason: data.reason,
+          compliance: 'Data Retention Policy'
+        },
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+        severity: 'high'
+      }
+    });
+  }
+
+  private static sanitizeForCompliance(data: any): any {
+    if (!data) return null;
+    
+    const sanitized = { ...data };
+    
+    // Remove sensitive fields that shouldn't be audited
+    const sensitiveFields = [
+      'password', 'currentPassword', 'newPassword', 'confirmPassword',
+      'token', 'apiKey', 'privateKey', 'secret', 'ssn', 'creditCard'
+    ];
+    
+    sensitiveFields.forEach(field => {
+      if (field in sanitized) {
+        sanitized[field] = '[REDACTED]';
+      }
+    });
+    
+    return sanitized;
+  }
+
+  private static determineAuditSeverity(
+    req: Request,
+    dataClassification: string
+  ): 'low' | 'medium' | 'high' | 'critical' {
+    // High-risk operations
+    if (req.method === 'DELETE' || req.originalUrl.includes('delete')) {
+      return 'high';
+    }
+    
+    // Restricted data access
+    if (dataClassification === 'restricted' || dataClassification === 'confidential') {
+      return 'high';
+    }
+    
+    // Administrative operations
+    if (req.originalUrl.includes('admin') || req.originalUrl.includes('settings')) {
+      return 'medium';
+    }
+    
+    // Default
+    return 'low';
+  }
+
+  private static calculateRiskScore(req: Request, eventType: string): number {
+    let score = 0;
+    
+    // Base score by event type
+    switch (eventType) {
+      case 'login_failure': score += 20; break;
+      case 'brute_force': score += 80; break;
+      case 'suspicious_activity': score += 60; break;
+      case 'data_access': score += 30; break;
+      default: score += 10;
+    }
+    
+    // Increase for failed requests
+    if (req.statusCode && req.statusCode >= 400) {
+      score += 20;
+    }
+    
+    // Increase for admin endpoints
+    if (req.originalUrl.includes('admin')) {
+      score += 30;
+    }
+    
+    return Math.min(score, 100);
+  }
+
+  private static async getLocationFromIP(ipAddress: string): Promise<SecurityEvent['location']> {
+    // Simplified location detection - in production, use a proper GeoIP service
+    return {
+      country: 'Unknown',
+      city: 'Unknown',
+      coordinates: undefined
+    };
+  }
+
   // Utility methods
   private static getClientIP(req: Request): string {
     return (
@@ -289,12 +613,24 @@ export const auditMiddleware = {
   accountDelete: AuditMiddleware.auditSensitiveOperation('ACCOUNT_DELETE'),
   dataExport: AuditMiddleware.auditSensitiveOperation('DATA_EXPORT'),
   
+  // Compliance operations
+  gdprCompliance: AuditMiddleware.personalDataAudit(),
+  pciCompliance: AuditMiddleware.financialDataAudit(),
+  dataRetention: (period: string) => AuditMiddleware.dataRetentionAudit(period),
+  
+  // Enhanced security events
+  loginFailure: AuditMiddleware.enhancedSecurityEvent('login_failure', 'medium'),
+  suspiciousActivity: AuditMiddleware.enhancedSecurityEvent('suspicious_activity', 'high'),
+  bruteForce: AuditMiddleware.enhancedSecurityEvent('brute_force', 'critical'),
+  dataAccess: AuditMiddleware.enhancedSecurityEvent('data_access', 'medium'),
+  
   // General middleware
   auto: AuditMiddleware.autoAudit,
   log: AuditMiddleware.logActivity,
   capture: AuditMiddleware.captureOldValues,
   skip: AuditMiddleware.skipAudit,
-  security: AuditMiddleware.logSecurityEvent
+  security: AuditMiddleware.logSecurityEvent,
+  compliance: AuditMiddleware.complianceAudit
 };
 
 export { AuditMiddleware };
