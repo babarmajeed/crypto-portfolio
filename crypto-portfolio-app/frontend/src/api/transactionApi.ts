@@ -290,7 +290,7 @@ class TransactionApi {
 
     if (query.asset && query.asset !== 'all') {
       filteredTransactions = filteredTransactions.filter(tx => 
-        tx.asset.toLowerCase().includes(query.asset.toLowerCase())
+        tx.asset.toLowerCase().includes(query.asset!.toLowerCase())
       );
     }
 

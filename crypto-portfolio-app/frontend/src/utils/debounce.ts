@@ -1,4 +1,4 @@
-import React from 'react';
+// Removed React import as it's not needed for utility functions
 
 /**
  * Debounce function to limit the rate of function execution
