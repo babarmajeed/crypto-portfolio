@@ -15,7 +15,7 @@ router.get('/status', async (req, res) => {
         supportedExchanges: ['binance', 'coinbase', 'kraken', 'kucoin'],
         status: {
           binance: 'active',
-          coinbase: 'planned',
+          coinbase: 'active',
           kraken: 'planned', 
           kucoin: 'planned'
         },

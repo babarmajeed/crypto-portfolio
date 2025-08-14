@@ -1,4 +1,5 @@
 import { BinanceClient } from './binanceClient';
+import { CoinbaseClient } from './coinbaseClient';
 import { loggingService } from '../loggingService';
 import { prisma } from '../../config/database';
 import { EventEmitter } from 'events';
@@ -37,6 +38,7 @@ interface ExchangeCredentials {
   exchange: string;
   apiKey: string;
   apiSecret: string;
+  passphrase?: string;
   sandbox: boolean;
   isActive: boolean;
   createdAt: Date;
@@ -55,6 +57,7 @@ export class ExchangeService extends EventEmitter {
   private initializePublicClients(): void {
     // Initialize public clients that don't require authentication
     this.publicClients.set('binance', BinanceClient.createPublic());
+    this.publicClients.set('coinbase', CoinbaseClient.createPublic());
   }
 
   async getUserExchangeClient(userId: string, exchange: string): Promise<any> {
@@ -73,6 +76,12 @@ export class ExchangeService extends EventEmitter {
     switch (exchange.toLowerCase()) {
       case 'binance':
         client = BinanceClient.createWithCredentials(credentials.apiKey, credentials.apiSecret);
+        break;
+      case 'coinbase':
+        if (!credentials.passphrase) {
+          throw new Error('Passphrase is required for Coinbase Pro');
+        }
+        client = CoinbaseClient.createWithCredentials(credentials.apiKey, credentials.apiSecret, credentials.passphrase);
         break;
       default:
         throw new Error(`Exchange ${exchange} not supported`);
@@ -383,12 +392,18 @@ export class ExchangeService extends EventEmitter {
     }
   }
 
-  async validateCredentials(userId: string, exchange: string, apiKey: string, apiSecret: string): Promise<boolean> {
+  async validateCredentials(userId: string, exchange: string, apiKey: string, apiSecret: string, passphrase?: string): Promise<boolean> {
     try {
       let client;
       switch (exchange.toLowerCase()) {
         case 'binance':
           client = BinanceClient.createWithCredentials(apiKey, apiSecret);
+          break;
+        case 'coinbase':
+          if (!passphrase) {
+            throw new Error('Passphrase is required for Coinbase Pro');
+          }
+          client = CoinbaseClient.createWithCredentials(apiKey, apiSecret, passphrase);
           break;
         default:
           throw new Error(`Exchange ${exchange} not supported`);
@@ -411,11 +426,12 @@ export class ExchangeService extends EventEmitter {
     exchange: string,
     apiKey: string,
     apiSecret: string,
-    sandbox: boolean = false
+    sandbox: boolean = false,
+    passphrase?: string
   ): Promise<ExchangeCredentials> {
     try {
       // Validate credentials first
-      const isValid = await this.validateCredentials(userId, exchange, apiKey, apiSecret);
+      const isValid = await this.validateCredentials(userId, exchange, apiKey, apiSecret, passphrase);
       if (!isValid) {
         throw new Error('Invalid API credentials');
       }
@@ -438,6 +454,7 @@ export class ExchangeService extends EventEmitter {
           exchange: exchange.toLowerCase(),
           apiKey,
           apiSecret, // In production, this should be encrypted
+          passphrase: passphrase || null,
           sandboxMode: sandbox,
           isActive: true
         }
@@ -495,7 +512,7 @@ export class ExchangeService extends EventEmitter {
   }
 
   getSupportedExchanges(): string[] {
-    return ['binance']; // Will expand as more exchanges are added
+    return ['binance', 'coinbase']; // Will expand as more exchanges are added
   }
 
   async getExchangeStatus(): Promise<Record<string, any>> {
