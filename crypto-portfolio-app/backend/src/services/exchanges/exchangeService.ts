@@ -1,6 +1,7 @@
 import { BinanceClient } from './binanceClient';
 import { CoinbaseClient } from './coinbaseClient';
 import { KrakenClient } from './krakenClient';
+import { KuCoinClient } from './kucoinClient';
 import { loggingService } from '../loggingService';
 import { prisma } from '../../config/database';
 import { EventEmitter } from 'events';
@@ -60,6 +61,7 @@ export class ExchangeService extends EventEmitter {
     this.publicClients.set('binance', BinanceClient.createPublic());
     this.publicClients.set('coinbase', CoinbaseClient.createPublic());
     this.publicClients.set('kraken', KrakenClient.createPublic());
+    this.publicClients.set('kucoin', KuCoinClient.createPublic());
   }
 
   async getUserExchangeClient(userId: string, exchange: string): Promise<any> {
@@ -87,6 +89,12 @@ export class ExchangeService extends EventEmitter {
         break;
       case 'kraken':
         client = KrakenClient.createWithCredentials(credentials.apiKey, credentials.apiSecret);
+        break;
+      case 'kucoin':
+        if (!credentials.passphrase) {
+          throw new Error('Passphrase is required for KuCoin');
+        }
+        client = KuCoinClient.createWithCredentials(credentials.apiKey, credentials.apiSecret, credentials.passphrase);
         break;
       default:
         throw new Error(`Exchange ${exchange} not supported`);
@@ -413,6 +421,12 @@ export class ExchangeService extends EventEmitter {
         case 'kraken':
           client = KrakenClient.createWithCredentials(apiKey, apiSecret);
           break;
+        case 'kucoin':
+          if (!passphrase) {
+            throw new Error('Passphrase is required for KuCoin');
+          }
+          client = KuCoinClient.createWithCredentials(apiKey, apiSecret, passphrase);
+          break;
         default:
           throw new Error(`Exchange ${exchange} not supported`);
       }
@@ -520,7 +534,7 @@ export class ExchangeService extends EventEmitter {
   }
 
   getSupportedExchanges(): string[] {
-    return ['binance', 'coinbase', 'kraken']; // Will expand as more exchanges are added
+    return ['binance', 'coinbase', 'kraken', 'kucoin']; // Will expand as more exchanges are added
   }
 
   async getExchangeStatus(): Promise<Record<string, any>> {

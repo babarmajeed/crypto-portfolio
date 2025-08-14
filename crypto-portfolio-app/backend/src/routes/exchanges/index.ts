@@ -2,6 +2,7 @@ import { Router } from 'express';
 import binanceRoutes from './binance.routes';
 import coinbaseRoutes from './coinbase.routes';
 import krakenRoutes from './kraken.routes';
+import kucoinRoutes from './kucoin.routes';
 
 const router = Router();
 
@@ -9,8 +10,6 @@ const router = Router();
 router.use('/binance', binanceRoutes);
 router.use('/coinbase', coinbaseRoutes);
 router.use('/kraken', krakenRoutes);
-
-// Future exchange routes will be added here
-// router.use('/kucoin', kucoinRoutes);
+router.use('/kucoin', kucoinRoutes);
 
 export default router;
