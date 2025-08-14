@@ -1,0 +1,1017 @@
+/* Asset Cards Styles */
+
+/* Container Layouts */
+.asset-card-grid-container,
+.asset-card-list-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Controls Bar */
+.controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+.search-control {
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-control,
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.control-icon {
+  color: #6b7280;
+}
+
+.filter-select,
+.sort-select {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+}
+
+.sort-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: white;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sort-button:hover {
+  background: #f9fafb;
+}
+
+.view-toggle {
+  display: flex;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+
+.view-btn {
+  padding: 0.5rem;
+  border: none;
+  background: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-btn:hover {
+  background: #f9fafb;
+}
+
+.view-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+/* Results Info */
+.results-info {
+  padding: 0 1rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.search-info {
+  font-weight: 500;
+  color: #3b82f6;
+}
+
+/* Grid Layout */
+.asset-cards.grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+/* List Layout */
+.asset-cards.list-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+/* Asset Card Base Styles */
+.asset-card {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.asset-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.asset-card.hovered {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.asset-card.has-holding {
+  border-left: 4px solid #10b981;
+}
+
+/* Grid Card Styles */
+.asset-card-grid {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 280px;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.asset-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.asset-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #f3f4f6;
+}
+
+.asset-details h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: #111827;
+}
+
+.asset-details p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0;
+}
+
+.asset-rank {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+}
+
+.watchlist-btn {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #6b7280;
+}
+
+.watchlist-btn:hover {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.watchlist-btn.active {
+  border-color: #fbbf24;
+  color: #fbbf24;
+  background: #fef3c7;
+}
+
+/* Price Section */
+.price-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.current-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.price-change {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.price-change.positive {
+  color: #10b981;
+}
+
+.price-change.negative {
+  color: #ef4444;
+}
+
+.change-icon {
+  display: flex;
+  align-items: center;
+}
+
+.change-amount {
+  font-weight: 600;
+}
+
+.change-percentage {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Chart Section */
+.chart-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+/* Holdings Section */
+.holding-section {
+  background: #f8fafc;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.holding-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.holding-summary .metric label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.holding-summary .metric span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.pnl-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.unrealized-pnl.positive {
+  color: #10b981;
+}
+
+.unrealized-pnl.negative {
+  color: #ef4444;
+}
+
+/* Quick Actions */
+.card-actions {
+  margin-top: auto;
+}
+
+.quick-actions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buy-btn.primary {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.buy-btn.primary:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
+}
+
+.sell-btn.secondary {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.sell-btn.secondary:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.watchlist-btn.outline {
+  background: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.watchlist-btn.outline:hover:not(:disabled) {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.watchlist-btn.active {
+  background: #fef3c7;
+  color: #f59e0b;
+  border-color: #fbbf24;
+}
+
+/* List Card Styles */
+.asset-card-list {
+  padding: 1rem 1.5rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 80px;
+}
+
+.asset-basic-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.asset-icon-name {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.asset-card-list .asset-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.asset-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.asset-symbol {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.875rem;
+}
+
+.asset-name {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.asset-card-list .asset-rank {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.asset-price-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.asset-price-info .current-price {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.asset-price-info .price-change {
+  font-size: 0.75rem;
+}
+
+.asset-chart {
+  display: flex;
+  justify-content: center;
+}
+
+.holding-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.holding-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.holding-pnl {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.holding-pnl.positive {
+  color: #10b981;
+}
+
+.holding-pnl.negative {
+  color: #ef4444;
+}
+
+.asset-market-data {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.asset-market-data .metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.asset-market-data label {
+  font-size: 0.625rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.asset-market-data span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.quick-actions-list {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quick-actions-list .action-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-actions-list .buy-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+}
+
+.quick-actions-list .sell-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+}
+
+.quick-actions-list .watchlist-btn {
+  background: white;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.quick-actions-list .watchlist-btn.active {
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
+/* Asset Metrics */
+.asset-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.asset-metrics.compact .metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.asset-metrics.detailed .metrics-section {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metric-icon {
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.metric-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-content label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.metric-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.metric-rank,
+.metric-date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Range Metric */
+.range-metric {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.range-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.range-low,
+.range-high {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.range-visual {
+  flex: 1;
+  position: relative;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+}
+
+.range-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to right, #ef4444, #10b981);
+  border-radius: 2px;
+}
+
+.range-indicator {
+  position: absolute;
+  top: -2px;
+  left: 60%; /* This would be calculated based on current price */
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+}
+
+/* Supply Progress */
+.supply-progress {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #10b981;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Details Overlay */
+.card-details-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 10;
+}
+
+.details-content {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.close-details {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+.close-details:hover {
+  background: #f3f4f6;
+}
+
+/* Skeleton Loading */
+.skeleton {
+  animation: skeleton-loading 1.5s infinite ease-in-out;
+}
+
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+  background: #e5e7eb;
+}
+
+.skeleton-text {
+  height: 1rem;
+  background: #e5e7eb;
+  border-radius: 0.25rem;
+}
+
+.skeleton-rect {
+  background: #e5e7eb;
+  border-radius: 0.25rem;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-color: #e5e7eb;
+  }
+  50% {
+    background-color: #f3f4f6;
+  }
+  100% {
+    background-color: #e5e7eb;
+  }
+}
+
+/* Error Card */
+.error-card {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.error-icon {
+  font-size: 2rem;
+}
+
+.error-message h4 {
+  color: #dc2626;
+  margin: 0 0 0.5rem 0;
+}
+
+.error-message p {
+  color: #7f1d1d;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.retry-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.retry-btn:hover {
+  background: #b91c1c;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #6b7280;
+}
+
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  color: #374151;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  max-width: 400px;
+}
+
+/* Sparkline */
+.sparkline-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sparkline-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  border-radius: 0.25rem;
+  border: 1px dashed #d1d5db;
+}
+
+.empty-message {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .asset-cards.grid-layout {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .asset-card-list {
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 0.75rem;
+  }
+
+  .asset-market-data {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .search-control {
+    min-width: auto;
+    max-width: none;
+  }
+
+  .asset-cards.grid-layout {
+    grid-template-columns: 1fr;
+    padding: 0.5rem;
+  }
+
+  .asset-card-grid {
+    padding: 1rem;
+  }
+
+  .asset-card-list {
+    grid-template-columns: 2fr 1fr auto;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .asset-price-info,
+  .holding-info {
+    display: none;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .asset-cards.grid-layout {
+    padding: 0.25rem;
+  }
+
+  .asset-card-grid {
+    padding: 0.75rem;
+    min-height: 240px;
+  }
+
+  .current-price {
+    font-size: 1.25rem;
+  }
+
+  .asset-card-list {
+    grid-template-columns: 1fr auto;
+  }
+
+  .asset-basic-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .quick-actions-list {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
