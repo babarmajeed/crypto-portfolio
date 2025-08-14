@@ -4,6 +4,7 @@ import coinbaseRoutes from './coinbase.routes';
 import krakenRoutes from './kraken.routes';
 import kucoinRoutes from './kucoin.routes';
 import multiExchangeSyncRoutes from './multiExchangeSync.routes';
+import webSocketRoutes from './webSocket.routes';
 
 const router = Router();
 
@@ -15,5 +16,8 @@ router.use('/kucoin', kucoinRoutes);
 
 // Mount multi-exchange synchronization routes
 router.use('/sync', multiExchangeSyncRoutes);
+
+// Mount WebSocket routes
+router.use('/websocket', webSocketRoutes);
 
 export default router;
