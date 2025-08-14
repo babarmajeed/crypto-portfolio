@@ -1,0 +1,251 @@
+/* Mobile-First Dashboard Styles */
+
+.dashboard-overview {
+  /* Ensure proper scrolling on mobile */
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Touch-friendly interactions */
+.touch-card {
+  /* Increase tap targets for mobile accessibility */
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.touch-card:active {
+  /* Provide visual feedback on touch */
+  transform: scale(0.98);
+  transition: transform 0.1s ease-out;
+}
+
+/* Swipe navigation styles */
+.swipe-container {
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.swipe-indicator {
+  /* Ensure indicators are easily accessible */
+  padding: 12px 0;
+}
+
+.swipe-indicator button {
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* Collapsible section animations */
+.collapsible-section {
+  /* Smooth transitions for mobile */
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.collapsible-content {
+  /* Optimize for mobile scrolling */
+  overflow: hidden;
+  will-change: height;
+}
+
+/* Mobile-specific spacing adjustments */
+@media (max-width: 767px) {
+  .dashboard-grid {
+    gap: 1rem;
+  }
+  
+  .dashboard-card {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .dashboard-header {
+    padding: 1rem 0;
+  }
+  
+  .quick-actions {
+    padding: 0.5rem 0;
+  }
+  
+  /* Ensure full-width touch targets */
+  .mobile-action-button {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Stack elements vertically on mobile */
+  .mobile-stack > * {
+    margin-bottom: 1rem;
+  }
+  
+  .mobile-stack > *:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* Tablet-specific adjustments */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-grid {
+    gap: 1.5rem;
+  }
+  
+  .dashboard-card {
+    padding: 1.5rem;
+  }
+  
+  .tablet-columns-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1024px) {
+  .desktop-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+  
+  .desktop-card-hover {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .desktop-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Performance optimizations for mobile */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+.reduce-motion {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark mode support (if implemented) */
+@media (prefers-color-scheme: dark) {
+  .dashboard-card-dark {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #f9fafb;
+  }
+  
+  .dashboard-text-dark {
+    color: #e5e7eb;
+  }
+  
+  .dashboard-text-muted-dark {
+    color: #9ca3af;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .dashboard-card {
+    border-width: 2px;
+    border-color: currentColor;
+  }
+  
+  .touch-card:focus {
+    outline: 3px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Animation classes for smooth mobile interactions */
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Loading states optimized for mobile */
+.mobile-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Viewport-specific optimizations */
+@supports (height: 100dvh) {
+  .full-viewport {
+    height: 100dvh;
+  }
+}
+
+@supports not (height: 100dvh) {
+  .full-viewport {
+    height: 100vh;
+  }
+}
+
+/* Safe area handling for modern mobile devices */
+@supports (padding: max(0px)) {
+  .safe-area-padding {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

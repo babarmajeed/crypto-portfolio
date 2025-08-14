@@ -1,25 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import { 
-  BarChart3, 
-  Briefcase, 
-  History, 
-  Settings,
-  TrendingUp,
-  Wallet
-} from 'lucide-react'
+import { navigation } from './navigationConfig'
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: BarChart3 },
-  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
-  { name: 'Transactions', href: '/transactions', icon: History },
-  { name: 'Market', href: '/market', icon: TrendingUp },
-  { name: 'Wallet', href: '/wallet', icon: Wallet },
-  { name: 'Settings', href: '/settings', icon: Settings },
-]
+interface SidebarProps {
+  className?: string;
+}
 
-export function Sidebar() {
+export function Sidebar({ className = '' }: SidebarProps) {
   return (
-    <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+    <aside className={`w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto hidden lg:block ${className}`}>
       <nav className="p-4 space-y-2">
         {navigation.map((item) => (
           <NavLink

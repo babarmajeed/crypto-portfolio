@@ -1,16 +1,36 @@
 import { Bell, Search, Settings, User } from 'lucide-react'
+import { useState } from 'react'
+import { HamburgerMenu, MobileNavigation, MobileSearchOverlay } from '../mobile'
 
-export function Header() {
+interface HeaderProps {
+  className?: string;
+}
+
+export function Header({ className = '' }: HeaderProps) {
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+
   return (
-    <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          Crypto Portfolio
-        </h1>
-      </div>
+    <>
+      <header className={`h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between ${className}`}>
+        <div className="flex items-center space-x-4">
+          {/* Mobile hamburger menu - only visible on mobile */}
+          <div className="lg:hidden">
+            <HamburgerMenu
+              isOpen={isMobileNavOpen}
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              ariaLabel="Toggle mobile navigation"
+            />
+          </div>
+          
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            Crypto Portfolio
+          </h1>
+        </div>
 
-      <div className="flex-1 max-w-lg mx-8">
-        <div className="relative">
+      {/* Search bar - hidden on mobile */}
+      <div className="hidden md:flex flex-1 max-w-lg mx-8">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
@@ -20,17 +40,47 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <button className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+      <div className="flex items-center space-x-2 sm:space-x-4">
+        {/* Mobile search button */}
+        <button 
+          onClick={() => setIsMobileSearchOpen(true)}
+          className="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Open search"
+        >
+          <Search className="w-5 h-5" />
+        </button>
+        
+        <button className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <Bell className="w-5 h-5" />
         </button>
-        <button className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+        
+        {/* Settings button - hidden on mobile if navigation is open */}
+        <button className={`p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isMobileNavOpen ? 'lg:block hidden' : ''}`}>
           <Settings className="w-5 h-5" />
         </button>
-        <button className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+        
+        <button className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <User className="w-5 h-5" />
         </button>
       </div>
     </header>
+
+    {/* Mobile Navigation */}
+    <MobileNavigation
+      isOpen={isMobileNavOpen}
+      onClose={() => setIsMobileNavOpen(false)}
+    />
+
+    {/* Mobile Search Overlay */}
+    <MobileSearchOverlay
+      isOpen={isMobileSearchOpen}
+      onClose={() => setIsMobileSearchOpen(false)}
+      onSearch={(query) => {
+        console.log('Search query:', query);
+        // Handle search logic here
+      }}
+      recentSearches={['Bitcoin', 'Ethereum']}
+    />
+  </>
   )
 }

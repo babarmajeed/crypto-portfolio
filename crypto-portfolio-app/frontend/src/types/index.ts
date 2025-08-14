@@ -122,3 +122,40 @@ export interface MarketOverview {
     ethereum: number
   }
 }
+
+// Export additional types from other modules
+export * from './auth';
+export * from './user';
+export * from './notification.types';
+export * from './settings.types';
+
+// CP-034: Responsive Design Types
+export * from './responsive.types';
+
+// Re-export commonly used responsive types
+export type {
+  // Responsive
+  UseResponsiveReturn,
+  ResponsiveState,
+  UseTouchReturn,
+  UseSwipeReturn,
+  TouchHookOptions,
+  SwipeHookOptions,
+  ResponsiveHookOptions,
+  Breakpoint,
+  ScreenSize,
+  DeviceInfo,
+  TapEvent,
+  PinchEvent,
+  GestureEvent,
+  SwipeEvent,
+  SwipeDirection,
+  TouchPoint
+} from './responsive.types';
+
+// Constants
+export {
+  DEFAULT_BREAKPOINTS,
+  TOUCH_EVENTS,
+  DEVICE_THRESHOLDS
+} from './responsive.types';
