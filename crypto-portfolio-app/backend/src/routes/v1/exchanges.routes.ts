@@ -16,7 +16,7 @@ router.get('/status', async (req, res) => {
         status: {
           binance: 'active',
           coinbase: 'active',
-          kraken: 'planned', 
+          kraken: 'active', 
           kucoin: 'planned'
         },
         features: [

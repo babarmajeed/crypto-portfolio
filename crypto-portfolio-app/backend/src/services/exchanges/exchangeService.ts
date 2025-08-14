@@ -1,5 +1,6 @@
 import { BinanceClient } from './binanceClient';
 import { CoinbaseClient } from './coinbaseClient';
+import { KrakenClient } from './krakenClient';
 import { loggingService } from '../loggingService';
 import { prisma } from '../../config/database';
 import { EventEmitter } from 'events';
@@ -58,6 +59,7 @@ export class ExchangeService extends EventEmitter {
     // Initialize public clients that don't require authentication
     this.publicClients.set('binance', BinanceClient.createPublic());
     this.publicClients.set('coinbase', CoinbaseClient.createPublic());
+    this.publicClients.set('kraken', KrakenClient.createPublic());
   }
 
   async getUserExchangeClient(userId: string, exchange: string): Promise<any> {
@@ -82,6 +84,9 @@ export class ExchangeService extends EventEmitter {
           throw new Error('Passphrase is required for Coinbase Pro');
         }
         client = CoinbaseClient.createWithCredentials(credentials.apiKey, credentials.apiSecret, credentials.passphrase);
+        break;
+      case 'kraken':
+        client = KrakenClient.createWithCredentials(credentials.apiKey, credentials.apiSecret);
         break;
       default:
         throw new Error(`Exchange ${exchange} not supported`);
@@ -405,6 +410,9 @@ export class ExchangeService extends EventEmitter {
           }
           client = CoinbaseClient.createWithCredentials(apiKey, apiSecret, passphrase);
           break;
+        case 'kraken':
+          client = KrakenClient.createWithCredentials(apiKey, apiSecret);
+          break;
         default:
           throw new Error(`Exchange ${exchange} not supported`);
       }
@@ -512,7 +520,7 @@ export class ExchangeService extends EventEmitter {
   }
 
   getSupportedExchanges(): string[] {
-    return ['binance', 'coinbase']; // Will expand as more exchanges are added
+    return ['binance', 'coinbase', 'kraken']; // Will expand as more exchanges are added
   }
 
   async getExchangeStatus(): Promise<Record<string, any>> {
@@ -531,6 +539,35 @@ export class ExchangeService extends EventEmitter {
     }
 
     return status;
+  }
+
+  // Convenience methods for consistent controller API
+  async saveCredentials(
+    userId: string,
+    exchange: string,
+    apiKey: string,
+    apiSecret: string,
+    passphrase?: string,
+    sandbox: boolean = false
+  ): Promise<ExchangeCredentials> {
+    return this.saveUserCredentials(userId, exchange, apiKey, apiSecret, sandbox, passphrase);
+  }
+
+  async deleteCredentials(userId: string, exchange: string): Promise<void> {
+    return this.removeUserCredentials(userId, exchange);
+  }
+
+  async hasValidCredentials(userId: string, exchange: string): Promise<boolean> {
+    try {
+      const credentials = await this.getUserCredentials(userId, exchange);
+      return !!credentials && credentials.isActive;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async getAuthenticatedClient(userId: string, exchange: string): Promise<any> {
+    return this.getUserExchangeClient(userId, exchange);
   }
 }
 
