@@ -1,291 +1,711 @@
-import { SentimentAnalysis } from '../types/news.types';
+import {
+  SentimentAnalysisResponse,
+  AggregatedSentiment,
+  SentimentSource,
+  SentimentFilters,
+  SentimentHistory,
+  SentimentHistoryPoint,
+  SentimentInsight,
+  SentimentScore,
+  SentimentError,
+  NewsSentiment,
+  NewsHeadline,
+  MockSentimentConfig
+} from '../types/sentiment.types';
 
 export class SentimentAnalysisService {
-  private baseURL: string;
-  private cache = new Map<string, { result: SentimentAnalysis; timestamp: number }>();
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private readonly defaultCacheExpiry = 5 * 60 * 1000; // 5 minutes
+  private readonly apiBaseUrl = process.env.REACT_APP_SENTIMENT_API_URL || '';
+  
+  private mockConfig: MockSentimentConfig = {
+    volatility: 0.3,
+    trend: 0.1,
+    cyclePeriod: 14,
+    noiseLevel: 0.2
+  };
 
-  constructor(baseURL: string = '/api') {
-    this.baseURL = baseURL;
-  }
-
-  async analyzeSentiment(text: string): Promise<SentimentAnalysis> {
-    const cacheKey = this.getCacheKey(text);
-    const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
-
+  // Main sentiment analysis endpoint
+  async getSentimentAnalysis(
+    symbols: string[] = ['BTC'],
+    filters: SentimentFilters = {}
+  ): Promise<SentimentAnalysisResponse> {
     try {
-      // In production, this would call a real sentiment analysis API
-      // For now, we'll use a sophisticated mock implementation
-      const sentiment = this.mockSentimentAnalysis(text);
+      const cacheKey = this.generateCacheKey('sentiment', symbols, filters);
+      const cached = this.getFromCache(cacheKey);
       
-      this.setCache(cacheKey, sentiment);
-      return sentiment;
-    } catch (error) {
-      console.error('Error analyzing sentiment:', error);
-      
-      // Return neutral sentiment on error
-      return {
-        score: 0,
-        label: 'neutral',
-        confidence: 0,
-        keywords: []
+      if (cached) {
+        return cached;
+      }
+
+      // In production, this would make actual API calls
+      // For now, using sophisticated mock data
+      const [
+        aggregatedSentiment,
+        newsSentiment,
+        socialSentiment,
+        onChainSentiment,
+        sentimentHistory
+      ] = await Promise.all([
+        this.getAggregatedSentiment(symbols, filters),
+        this.getNewsSentiment(symbols, filters),
+        this.getSocialSentiment(symbols, filters),
+        this.getOnChainSentiment(symbols, filters),
+        this.getSentimentHistory(symbols, filters.timeframe || '7d')
+      ]);
+
+      const response: SentimentAnalysisResponse = {
+        aggregatedSentiment,
+        fearGreedIndex: await this.getFearGreedIndexData(),
+        newsSentiment,
+        socialSentiment,
+        onChainSentiment,
+        sentimentHistory,
+        correlations: await this.getSentimentCorrelations(symbols, filters.timeframe || '7d'),
+        lastUpdated: new Date().toISOString()
       };
+
+      this.setCache(cacheKey, response);
+      return response;
+    } catch (error) {
+      console.error('Error in sentiment analysis:', error);
+      throw this.createSentimentError('ANALYSIS_FAILED', 'Failed to analyze sentiment', error);
     }
   }
 
-  async batchAnalyzeSentiment(texts: string[]): Promise<SentimentAnalysis[]> {
-    const results = await Promise.all(
-      texts.map(text => this.analyzeSentiment(text))
-    );
-    return results;
+  // Aggregated sentiment from all sources
+  private async getAggregatedSentiment(
+    symbols: string[],
+    filters: SentimentFilters
+  ): Promise<AggregatedSentiment> {
+    const sources: SentimentSource[] = [
+      {
+        name: 'News',
+        score: this.generateSentimentScore(),
+        confidence: 0.8,
+        weight: 0.3,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        name: 'Social Media',
+        score: this.generateSentimentScore(),
+        confidence: 0.7,
+        weight: 0.4,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        name: 'On-Chain',
+        score: this.generateSentimentScore(),
+        confidence: 0.9,
+        weight: 0.3,
+        lastUpdated: new Date().toISOString()
+      }
+    ];
+
+    const weightedScore = sources.reduce((acc, source) => {
+      return acc + (source.score * (source.weight || 1) * source.confidence);
+    }, 0) / sources.reduce((acc, source) => acc + (source.weight || 1) * source.confidence, 0);
+
+    const confidence = sources.reduce((acc, source) => acc + source.confidence, 0) / sources.length;
+
+    const insights = this.generateSentimentInsights(weightedScore, sources);
+    const trend = this.determineTrend(weightedScore);
+
+    return {
+      score: weightedScore,
+      confidence,
+      magnitude: Math.abs(weightedScore),
+      sources,
+      insights,
+      trend,
+      volatility: this.calculateVolatility(sources)
+    };
   }
 
-  private mockSentimentAnalysis(text: string): SentimentAnalysis {
-    const lowerText = text.toLowerCase();
+  // News sentiment analysis
+  private async getNewsSentiment(
+    symbols: string[],
+    filters: SentimentFilters
+  ): Promise<NewsSentiment> {
+    const headlines = this.generateMockNewsHeadlines(symbols, 20);
+    const sourceBreakdown = this.generateSourceBreakdown();
     
-    // Define sentiment keywords and their weights
-    const positiveKeywords = {
-      // Strong positive
-      'bullish': 0.8, 'surge': 0.7, 'rally': 0.7, 'moon': 0.9, 'pump': 0.6,
-      'breakthrough': 0.7, 'milestone': 0.6, 'adoption': 0.6, 'partnership': 0.5,
-      'upgrade': 0.5, 'innovation': 0.6, 'growth': 0.5, 'success': 0.6,
-      'profit': 0.7, 'gains': 0.6, 'rise': 0.4, 'increase': 0.4, 'buy': 0.3,
-      'bullrun': 0.8, 'ath': 0.7, 'record': 0.5, 'high': 0.3, 'up': 0.2,
-      'positive': 0.5, 'good': 0.3, 'great': 0.5, 'excellent': 0.7,
-      'amazing': 0.6, 'outstanding': 0.7, 'impressive': 0.6, 'strong': 0.4,
-      'solid': 0.4, 'stable': 0.3, 'secure': 0.4, 'promising': 0.5,
-      'opportunity': 0.4, 'potential': 0.3, 'optimistic': 0.6, 'confident': 0.5
+    const overallScore = headlines.reduce((acc, headline) => {
+      return acc + headline.sentiment.score * headline.relevance;
+    }, 0) / headlines.reduce((acc, headline) => acc + headline.relevance, 0);
+
+    const confidence = headlines.reduce((acc, headline) => {
+      return acc + headline.sentiment.confidence;
+    }, 0) / headlines.length;
+
+    return {
+      score: overallScore,
+      confidence,
+      magnitude: Math.abs(overallScore),
+      articleCount: headlines.length,
+      sources: ['CoinDesk', 'Cointelegraph', 'CryptoNews', 'Decrypt', 'The Block'],
+      topHeadlines: headlines.slice(0, 10),
+      sourceBreakdown
     };
+  }
 
-    const negativeKeywords = {
-      // Strong negative
-      'bearish': -0.8, 'crash': -0.8, 'dump': -0.7, 'collapse': -0.9,
-      'hack': -0.8, 'scam': -0.9, 'fraud': -0.9, 'ponzi': -0.9,
-      'bubble': -0.6, 'overvalued': -0.5, 'risk': -0.4, 'danger': -0.6,
-      'warning': -0.5, 'concern': -0.4, 'problem': -0.4, 'issue': -0.3,
-      'fall': -0.4, 'drop': -0.4, 'decline': -0.4, 'decrease': -0.4,
-      'loss': -0.6, 'losses': -0.6, 'sell': -0.3, 'bear': -0.5,
-      'down': -0.2, 'low': -0.3, 'weak': -0.4, 'poor': -0.5,
-      'bad': -0.4, 'terrible': -0.7, 'awful': -0.7, 'disappointing': -0.5,
-      'concerning': -0.4, 'worried': -0.5, 'fear': -0.6, 'panic': -0.7,
-      'uncertainty': -0.4, 'volatile': -0.3, 'unstable': -0.4, 'risky': -0.4
-    };
-
-    const neutralKeywords = {
-      'stable': 0, 'sideways': 0, 'consolidation': 0, 'range': 0,
-      'analysis': 0, 'report': 0, 'data': 0, 'news': 0, 'update': 0
-    };
-
-    // Calculate base sentiment score
-    let score = 0;
-    let totalWeight = 0;
-    const foundKeywords: string[] = [];
-    const emotions = { fear: 0, greed: 0, optimism: 0, uncertainty: 0 };
-
-    // Check positive keywords
-    for (const [keyword, weight] of Object.entries(positiveKeywords)) {
-      if (lowerText.includes(keyword)) {
-        score += weight;
-        totalWeight += Math.abs(weight);
-        foundKeywords.push(keyword);
-        
-        // Update emotions
-        if (['moon', 'pump', 'bullrun', 'gains', 'profit'].includes(keyword)) {
-          emotions.greed += weight * 0.5;
-        }
-        if (['breakthrough', 'innovation', 'growth', 'promising'].includes(keyword)) {
-          emotions.optimism += weight * 0.7;
-        }
+  // Social media sentiment analysis
+  private async getSocialSentiment(symbols: string[], filters: SentimentFilters): Promise<any> {
+    const twitterSentiment = {
+      score: this.generateSentimentScore(),
+      confidence: 0.7,
+      magnitude: Math.random() * 0.8 + 0.2,
+      mentionCount: Math.floor(Math.random() * 5000) + 1000,
+      engagementRate: Math.random() * 0.1 + 0.02,
+      retweetRatio: Math.random() * 0.3 + 0.1,
+      topTweets: this.generateMockTweets(5),
+      hashtagSentiment: {
+        '#BTC': { score: this.generateSentimentScore(), confidence: 0.8 },
+        '#Bitcoin': { score: this.generateSentimentScore(), confidence: 0.9 },
+        '#crypto': { score: this.generateSentimentScore(), confidence: 0.7 }
       }
-    }
+    };
 
-    // Check negative keywords
-    for (const [keyword, weight] of Object.entries(negativeKeywords)) {
-      if (lowerText.includes(keyword)) {
-        score += weight;
-        totalWeight += Math.abs(weight);
-        foundKeywords.push(keyword);
-        
-        // Update emotions
-        if (['crash', 'dump', 'hack', 'scam', 'panic'].includes(keyword)) {
-          emotions.fear += Math.abs(weight) * 0.8;
-        }
-        if (['risk', 'uncertainty', 'concern', 'warning'].includes(keyword)) {
-          emotions.uncertainty += Math.abs(weight) * 0.6;
-        }
+    const redditSentiment = {
+      score: this.generateSentimentScore(),
+      confidence: 0.8,
+      magnitude: Math.random() * 0.7 + 0.3,
+      postCount: Math.floor(Math.random() * 2000) + 500,
+      commentCount: Math.floor(Math.random() * 10000) + 2000,
+      upvoteRatio: Math.random() * 0.4 + 0.6,
+      topPosts: this.generateMockRedditPosts(5),
+      subredditBreakdown: {
+        'r/bitcoin': { score: this.generateSentimentScore(), confidence: 0.9 },
+        'r/cryptocurrency': { score: this.generateSentimentScore(), confidence: 0.8 },
+        'r/cryptomarkets': { score: this.generateSentimentScore(), confidence: 0.7 }
       }
-    }
+    };
 
-    // Normalize score
-    if (totalWeight > 0) {
-      score = score / totalWeight;
-    }
+    const discordSentiment = {
+      score: this.generateSentimentScore(),
+      confidence: 0.6,
+      magnitude: Math.random() * 0.6 + 0.2,
+      messageCount: Math.floor(Math.random() * 50000) + 10000,
+      serverCount: Math.floor(Math.random() * 100) + 20,
+      activeUsers: Math.floor(Math.random() * 10000) + 2000
+    };
 
-    // Apply text length penalty/bonus
-    const wordCount = text.split(/\s+/).length;
-    if (wordCount < 10) {
-      score *= 0.7; // Reduce confidence for very short texts
-    } else if (wordCount > 100) {
-      score *= 1.1; // Slight boost for longer, more detailed texts
-    }
+    const weightedScore = (
+      twitterSentiment.score * 0.5 +
+      redditSentiment.score * 0.4 +
+      discordSentiment.score * 0.1
+    );
 
-    // Clamp score to [-1, 1]
-    score = Math.max(-1, Math.min(1, score));
+    const confidence = (
+      twitterSentiment.confidence * 0.5 +
+      redditSentiment.confidence * 0.4 +
+      discordSentiment.confidence * 0.1
+    );
 
-    // Determine label
-    let label: 'positive' | 'negative' | 'neutral';
-    if (score > 0.1) {
-      label = 'positive';
-    } else if (score < -0.1) {
-      label = 'negative';
+    return {
+      score: weightedScore,
+      confidence,
+      magnitude: Math.abs(weightedScore),
+      platforms: {
+        twitter: twitterSentiment,
+        reddit: redditSentiment,
+        discord: discordSentiment
+      },
+      overallMentions: twitterSentiment.mentionCount + redditSentiment.postCount + redditSentiment.commentCount,
+      trendingTopics: ['#Bitcoin', '#Crypto', '#BullRun', '#HODL', '#DeFi'],
+      influencerSentiment: this.generateInfluencerSentiment()
+    };
+  }
+
+  // On-chain sentiment analysis
+  private async getOnChainSentiment(symbols: string[], filters: SentimentFilters): Promise<any> {
+    const metrics = {
+      activeAddresses: Math.floor(Math.random() * 500000) + 300000,
+      activeAddressesTrend: (Math.random() - 0.5) * 0.2,
+      transactionVolume: Math.floor(Math.random() * 1000000) + 500000,
+      transactionVolumeUSD: Math.floor(Math.random() * 50000000000) + 10000000000,
+      averageTransactionFee: Math.random() * 50 + 5,
+      mvrv: Math.random() * 3 + 0.5,
+      nvt: Math.random() * 200 + 50,
+      hodlWaves: this.generateHodlWaves()
+    };
+
+    const indicators = [
+      {
+        name: 'MVRV Ratio',
+        value: metrics.mvrv,
+        signal: metrics.mvrv > 2.5 ? 'bearish' : metrics.mvrv < 1 ? 'bullish' : 'neutral',
+        strength: Math.min(Math.abs(metrics.mvrv - 1.5) / 1.5, 1),
+        description: 'Market Value to Realized Value ratio indicates if asset is over/undervalued'
+      },
+      {
+        name: 'Network Value to Transactions',
+        value: metrics.nvt,
+        signal: metrics.nvt > 150 ? 'bearish' : metrics.nvt < 75 ? 'bullish' : 'neutral',
+        strength: Math.min(Math.abs(metrics.nvt - 100) / 100, 1),
+        description: 'High NVT suggests network is overvalued relative to transaction volume'
+      },
+      {
+        name: 'Active Addresses Trend',
+        value: metrics.activeAddressesTrend,
+        signal: metrics.activeAddressesTrend > 0.05 ? 'bullish' : metrics.activeAddressesTrend < -0.05 ? 'bearish' : 'neutral',
+        strength: Math.abs(metrics.activeAddressesTrend) * 5,
+        description: 'Growing active addresses indicates increasing network adoption'
+      }
+    ];
+
+    const whaleActivity = {
+      largeTransactions: Math.floor(Math.random() * 500) + 100,
+      whaleNetFlow: (Math.random() - 0.5) * 10000,
+      topHolderConcentration: Math.random() * 0.3 + 0.4,
+      accumulationTrend: (Math.random() - 0.5) * 0.1,
+      distributionTrend: (Math.random() - 0.5) * 0.1
+    };
+
+    const exchangeFlows = {
+      inflow: Math.random() * 50000,
+      outflow: Math.random() * 55000,
+      netFlow: 0,
+      inflowTrend: (Math.random() - 0.5) * 0.2,
+      outflowTrend: (Math.random() - 0.5) * 0.2,
+      exchangeReserves: Math.random() * 3000000,
+      reservesTrend: (Math.random() - 0.5) * 0.1
+    };
+    exchangeFlows.netFlow = exchangeFlows.outflow - exchangeFlows.inflow;
+
+    const networkHealth = {
+      hashRate: Math.random() * 500000000000000000,
+      difficulty: Math.random() * 50000000000000,
+      blockTime: Math.random() * 2 + 9,
+      mempool: Math.floor(Math.random() * 100000) + 5000,
+      feesPressure: Math.random() * 100
+    };
+
+    // Calculate overall on-chain sentiment
+    let sentimentScore = 0;
+    let factorCount = 0;
+
+    // Exchange flow sentiment (outflow is bullish)
+    if (exchangeFlows.netFlow > 0) {
+      sentimentScore += 0.2;
     } else {
-      label = 'neutral';
+      sentimentScore -= 0.1;
     }
+    factorCount++;
 
-    // Calculate confidence based on keyword matches and score extremity
-    let confidence = Math.min(0.9, foundKeywords.length * 0.15 + Math.abs(score) * 0.5);
-    if (foundKeywords.length === 0) {
-      confidence = 0.3; // Low confidence for texts with no sentiment keywords
+    // Whale accumulation sentiment
+    if (whaleActivity.accumulationTrend > 0) {
+      sentimentScore += 0.15;
+    } else if (whaleActivity.distributionTrend > 0) {
+      sentimentScore -= 0.15;
     }
+    factorCount++;
 
-    // Normalize emotions to [0, 1] range
-    const maxEmotion = Math.max(emotions.fear, emotions.greed, emotions.optimism, emotions.uncertainty);
-    if (maxEmotion > 0) {
-      emotions.fear = Math.min(1, emotions.fear / maxEmotion);
-      emotions.greed = Math.min(1, emotions.greed / maxEmotion);
-      emotions.optimism = Math.min(1, emotions.optimism / maxEmotion);
-      emotions.uncertainty = Math.min(1, emotions.uncertainty / maxEmotion);
+    // Active addresses sentiment
+    if (metrics.activeAddressesTrend > 0) {
+      sentimentScore += 0.1;
+    } else {
+      sentimentScore -= 0.1;
+    }
+    factorCount++;
+
+    // MVRV sentiment
+    if (metrics.mvrv < 1) {
+      sentimentScore += 0.2; // Undervalued
+    } else if (metrics.mvrv > 2.5) {
+      sentimentScore -= 0.2; // Overvalued
+    }
+    factorCount++;
+
+    const finalScore = Math.max(-1, Math.min(1, sentimentScore / factorCount));
+
+    return {
+      score: finalScore,
+      confidence: 0.85,
+      magnitude: Math.abs(finalScore),
+      metrics,
+      indicators,
+      whaleActivity,
+      exchangeFlows,
+      networkHealth
+    };
+  }
+
+  // Get historical sentiment data
+  private async getSentimentHistory(
+    symbols: string[],
+    timeframe: string
+  ): Promise<SentimentHistory> {
+    const days = this.getTimeframeDays(timeframe);
+    const data: SentimentHistoryPoint[] = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      
+      // Generate correlated sentiment and price data
+      const sentiment = this.generateHistoricalSentiment(i, days);
+      const fearGreed = Math.max(0, Math.min(100, (sentiment + 1) * 50 + (Math.random() - 0.5) * 20));
+      
+      data.push({
+        date: date.toISOString(),
+        sentiment,
+        fearGreed,
+        volume: Math.random() * 10000000000 + 1000000000,
+        price: 50000 + sentiment * 10000 + (Math.random() - 0.5) * 5000,
+        sources: {
+          news: sentiment + (Math.random() - 0.5) * 0.3,
+          social: sentiment + (Math.random() - 0.5) * 0.4,
+          onChain: sentiment + (Math.random() - 0.5) * 0.2
+        }
+      });
     }
 
     return {
-      score: Number(score.toFixed(3)),
-      label,
-      confidence: Number(confidence.toFixed(2)),
-      keywords: foundKeywords.slice(0, 5), // Return top 5 keywords
-      emotions
+      data,
+      timeframe,
+      symbol: symbols[0],
+      correlations: {
+        priceCorrelation: 0.7 + Math.random() * 0.25,
+        volumeCorrelation: 0.4 + Math.random() * 0.3
+      }
     };
   }
 
-  async getSentimentTrends(timeframe: string = '24h'): Promise<SentimentAnalysis[]> {
-    // Mock implementation - in production, this would query historical sentiment data
-    const trends: SentimentAnalysis[] = [];
-    const intervals = this.getTimeframeIntervals(timeframe);
+  // Get Fear & Greed Index data
+  private async getFearGreedIndexData(): Promise<any> {
+    const value = Math.floor(Math.random() * 100);
     
-    for (let i = 0; i < intervals; i++) {
-      // Generate mock trend data with some randomness but realistic patterns
-      const baseScore = Math.sin(i * 0.5) * 0.3; // Create wave pattern
-      const noise = (Math.random() - 0.5) * 0.2; // Add some randomness
-      const score = Math.max(-1, Math.min(1, baseScore + noise));
+    let label: string;
+    if (value <= 25) label = 'Extreme Fear';
+    else if (value <= 45) label = 'Fear';
+    else if (value <= 55) label = 'Neutral';
+    else if (value <= 75) label = 'Greed';
+    else label = 'Extreme Greed';
+
+    const components = [
+      { name: 'Volatility', value: Math.random() * 100, weight: 25, description: 'Measuring current volatility' },
+      { name: 'Market Momentum/Volume', value: Math.random() * 100, weight: 25, description: 'Volume and momentum data' },
+      { name: 'Social Media', value: Math.random() * 100, weight: 15, description: 'Social media sentiment analysis' },
+      { name: 'Dominance', value: Math.random() * 100, weight: 10, description: 'Bitcoin dominance over altcoins' },
+      { name: 'Trends', value: Math.random() * 100, weight: 10, description: 'Google Trends data' },
+      { name: 'Surveys', value: Math.random() * 100, weight: 15, description: 'Public polling data' }
+    ];
+
+    return {
+      value,
+      label,
+      components,
+      lastUpdated: new Date().toISOString(),
+      trend: (Math.random() - 0.5) * 10,
+      historicalAverage: 45 + Math.random() * 20
+    };
+  }
+
+  // Get sentiment correlations with price
+  private async getSentimentCorrelations(symbols: string[], timeframe: string): Promise<any> {
+    return {
+      symbol: symbols[0],
+      timeframe,
+      correlations: {
+        sentimentToPrice: {
+          coefficient: 0.65 + Math.random() * 0.25,
+          significance: Math.random() * 0.05,
+          strength: 'moderate',
+          direction: 'positive',
+          lag: Math.floor(Math.random() * 3)
+        },
+        sentimentToVolume: {
+          coefficient: 0.45 + Math.random() * 0.3,
+          significance: Math.random() * 0.1,
+          strength: 'moderate',
+          direction: 'positive'
+        },
+        fearGreedToPrice: {
+          coefficient: 0.55 + Math.random() * 0.3,
+          significance: Math.random() * 0.05,
+          strength: 'moderate',
+          direction: 'positive'
+        },
+        socialToPrice: {
+          coefficient: 0.4 + Math.random() * 0.35,
+          significance: Math.random() * 0.1,
+          strength: 'weak',
+          direction: 'positive'
+        },
+        onChainToPrice: {
+          coefficient: 0.7 + Math.random() * 0.25,
+          significance: Math.random() * 0.02,
+          strength: 'strong',
+          direction: 'positive'
+        }
+      },
+      predictivePower: 0.6 + Math.random() * 0.25,
+      laggingIndicators: ['Social Media', 'News'],
+      leadingIndicators: ['On-Chain', 'Exchange Flows']
+    };
+  }
+
+  // Utility methods
+  private generateSentimentScore(): number {
+    const trend = this.mockConfig.trend;
+    const volatility = this.mockConfig.volatility;
+    const noise = this.mockConfig.noiseLevel;
+    
+    return Math.max(-1, Math.min(1, trend + (Math.random() - 0.5) * volatility + (Math.random() - 0.5) * noise));
+  }
+
+  private generateHistoricalSentiment(dayIndex: number, totalDays: number): number {
+    const cycle = Math.sin((dayIndex / this.mockConfig.cyclePeriod) * 2 * Math.PI) * 0.3;
+    const trend = this.mockConfig.trend * (dayIndex / totalDays);
+    const noise = (Math.random() - 0.5) * this.mockConfig.noiseLevel;
+    
+    return Math.max(-1, Math.min(1, cycle + trend + noise));
+  }
+
+  private generateSentimentInsights(score: number, sources: SentimentSource[]): SentimentInsight[] {
+    const insights: SentimentInsight[] = [];
+
+    if (score > 0.5) {
+      insights.push({
+        icon: '🚀',
+        text: 'Strong bullish sentiment across multiple sources',
+        impact: 'high',
+        type: 'positive',
+        confidence: 0.8
+      });
+    } else if (score < -0.5) {
+      insights.push({
+        icon: '📉',
+        text: 'Bearish sentiment dominating market psychology',
+        impact: 'high',
+        type: 'negative',
+        confidence: 0.8
+      });
+    }
+
+    // Source-specific insights
+    sources.forEach(source => {
+      if (Math.abs(source.score) > 0.6) {
+        insights.push({
+          icon: source.score > 0 ? '📈' : '📉',
+          text: `${source.name} showing ${source.score > 0 ? 'strong bullish' : 'strong bearish'} signals`,
+          impact: source.confidence > 0.8 ? 'high' : 'medium',
+          type: source.score > 0 ? 'positive' : 'negative',
+          source: source.name,
+          confidence: source.confidence
+        });
+      }
+    });
+
+    return insights;
+  }
+
+  private determineTrend(score: number): 'bullish' | 'bearish' | 'neutral' {
+    if (score > 0.2) return 'bullish';
+    if (score < -0.2) return 'bearish';
+    return 'neutral';
+  }
+
+  private calculateVolatility(sources: SentimentSource[]): number {
+    const scores = sources.map(s => s.score);
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const variance = scores.reduce((acc, score) => acc + Math.pow(score - mean, 2), 0) / scores.length;
+    return Math.sqrt(variance);
+  }
+
+  private generateMockNewsHeadlines(symbols: string[], count: number): NewsHeadline[] {
+    const headlines = [];
+    const sources = ['CoinDesk', 'Cointelegraph', 'CryptoNews', 'Decrypt', 'The Block'];
+    const templates = [
+      '{symbol} Price Analysis: Bulls Target ${price}',
+      'Technical Analysis: {symbol} Shows {sentiment} Signals',
+      'Market Update: {symbol} {action} Amid {context}',
+      'Breaking: {symbol} {event} Sparks {reaction}',
+      'Analysis: {symbol} Could {prediction} if {condition}'
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+      const template = templates[Math.floor(Math.random() * templates.length)];
+      const sentiment = this.generateSentimentScore();
       
-      trends.push({
-        score: Number(score.toFixed(3)),
-        label: score > 0.1 ? 'positive' : score < -0.1 ? 'negative' : 'neutral',
-        confidence: 0.7 + Math.random() * 0.2, // Random confidence between 0.7-0.9
-        keywords: []
+      headlines.push({
+        title: this.fillTemplate(template, symbol, sentiment),
+        source: sources[Math.floor(Math.random() * sources.length)],
+        url: `https://example.com/news/${i}`,
+        publishedAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
+        sentiment: {
+          score: sentiment,
+          confidence: 0.7 + Math.random() * 0.3
+        },
+        relevance: 0.5 + Math.random() * 0.5,
+        summary: 'Article summary would be extracted here...'
+      });
+    }
+
+    return headlines;
+  }
+
+  private fillTemplate(template: string, symbol: string, sentiment: number): string {
+    const replacements: Record<string, string> = {
+      '{symbol}': symbol,
+      '{price}': (50000 + Math.random() * 20000).toFixed(0),
+      '{sentiment}': sentiment > 0 ? 'Bullish' : 'Bearish',
+      '{action}': sentiment > 0 ? 'Rallies' : 'Declines',
+      '{context}': sentiment > 0 ? 'Positive Market Sentiment' : 'Market Uncertainty',
+      '{event}': Math.random() > 0.5 ? 'Technical Breakout' : 'Institutional News',
+      '{reaction}': sentiment > 0 ? 'Investor Optimism' : 'Market Concern',
+      '{prediction}': sentiment > 0 ? 'Rally Further' : 'Face Pressure',
+      '{condition}': 'Key Support Holds'
+    };
+
+    let result = template;
+    for (const [key, value] of Object.entries(replacements)) {
+      result = result.replace(key, value);
+    }
+    return result;
+  }
+
+  private generateSourceBreakdown(): Record<string, SentimentScore> {
+    return {
+      'CoinDesk': { score: this.generateSentimentScore(), confidence: 0.9 },
+      'Cointelegraph': { score: this.generateSentimentScore(), confidence: 0.8 },
+      'CryptoNews': { score: this.generateSentimentScore(), confidence: 0.7 },
+      'Decrypt': { score: this.generateSentimentScore(), confidence: 0.8 },
+      'The Block': { score: this.generateSentimentScore(), confidence: 0.85 }
+    };
+  }
+
+  private generateMockTweets(count: number): any[] {
+    const tweets = [];
+    const authors = ['CryptoAnalyst', 'BTCMaximalist', 'TraderJoe', 'CoinGuru', 'CryptoQueen'];
+    
+    for (let i = 0; i < count; i++) {
+      const sentiment = this.generateSentimentScore();
+      tweets.push({
+        id: `tweet_${i}`,
+        text: sentiment > 0 ? 'Bitcoin looking strong! 🚀' : 'Bearish signals in the market 📉',
+        author: authors[Math.floor(Math.random() * authors.length)],
+        authorFollowers: Math.floor(Math.random() * 100000) + 10000,
+        createdAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
+        sentiment: { score: sentiment, confidence: 0.7 },
+        engagement: {
+          likes: Math.floor(Math.random() * 1000),
+          retweets: Math.floor(Math.random() * 500),
+          replies: Math.floor(Math.random() * 100)
+        }
       });
     }
     
-    return trends;
+    return tweets;
   }
 
-  async getMarketSentimentMetrics(): Promise<{
-    overall: SentimentAnalysis;
-    byCategory: Record<string, SentimentAnalysis>;
-    trendingEmotions: { emotion: string; score: number; change: number }[];
-  }> {
-    // Mock implementation for overall market sentiment
-    const overall = await this.analyzeSentiment(
-      'Bitcoin adoption grows as institutions show bullish sentiment despite market volatility and regulatory concerns'
-    );
+  private generateMockRedditPosts(count: number): any[] {
+    const posts = [];
+    const subreddits = ['bitcoin', 'cryptocurrency', 'cryptomarkets'];
+    
+    for (let i = 0; i < count; i++) {
+      const sentiment = this.generateSentimentScore();
+      posts.push({
+        id: `post_${i}`,
+        title: sentiment > 0 ? 'BTC to the moon!' : 'Market correction incoming?',
+        subreddit: subreddits[Math.floor(Math.random() * subreddits.length)],
+        author: `user_${i}`,
+        createdAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
+        sentiment: { score: sentiment, confidence: 0.8 },
+        engagement: {
+          upvotes: Math.floor(Math.random() * 1000),
+          downvotes: Math.floor(Math.random() * 100),
+          comments: Math.floor(Math.random() * 200),
+          awards: Math.floor(Math.random() * 10)
+        }
+      });
+    }
+    
+    return posts;
+  }
 
-    const byCategory = {
-      'bitcoin': await this.analyzeSentiment('Bitcoin reaches new highs with institutional adoption'),
-      'ethereum': await this.analyzeSentiment('Ethereum staking rewards increase network security'),
-      'defi': await this.analyzeSentiment('DeFi protocols face liquidity concerns amid market uncertainty'),
-      'regulation': await this.analyzeSentiment('Regulatory framework development shows mixed signals'),
-      'adoption': await this.analyzeSentiment('Corporate treasury adoption of crypto accelerates growth')
-    };
-
-    const trendingEmotions = [
-      { emotion: 'optimism', score: 0.65, change: 0.12 },
-      { emotion: 'greed', score: 0.58, change: -0.08 },
-      { emotion: 'fear', score: 0.32, change: -0.15 },
-      { emotion: 'uncertainty', score: 0.45, change: 0.05 }
+  private generateInfluencerSentiment(): any[] {
+    const influencers = [
+      { name: 'PlanB', platform: 'Twitter', followers: 1500000 },
+      { name: 'Willy Woo', platform: 'Twitter', followers: 800000 },
+      { name: 'Preston Pysh', platform: 'Twitter', followers: 600000 }
     ];
 
-    return { overall, byCategory, trendingEmotions };
+    return influencers.map(influencer => ({
+      ...influencer,
+      sentiment: { score: this.generateSentimentScore(), confidence: 0.8 },
+      influence: Math.random() * 0.5 + 0.5,
+      recentPosts: Math.floor(Math.random() * 10) + 1
+    }));
   }
 
-  private getTimeframeIntervals(timeframe: string): number {
+  private generateHodlWaves(): any[] {
+    return [
+      { ageRange: '1d-1w', percentage: 15 + Math.random() * 10, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '1w-1m', percentage: 20 + Math.random() * 10, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '1m-3m', percentage: 15 + Math.random() * 10, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '3m-6m', percentage: 12 + Math.random() * 8, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '6m-1y', percentage: 10 + Math.random() * 8, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '1y-2y', percentage: 15 + Math.random() * 10, trend: (Math.random() - 0.5) * 0.1 },
+      { ageRange: '2y+', percentage: 13 + Math.random() * 12, trend: (Math.random() - 0.5) * 0.1 }
+    ];
+  }
+
+  private getTimeframeDays(timeframe: string): number {
     switch (timeframe) {
-      case '1h': return 12; // 5-minute intervals
-      case '6h': return 24; // 15-minute intervals
-      case '24h': return 24; // 1-hour intervals
-      case '7d': return 168; // 1-hour intervals
-      case '30d': return 30; // 1-day intervals
-      default: return 24;
+      case '1h': return 1;
+      case '4h': return 1;
+      case '1d': return 7;
+      case '7d': return 7;
+      case '30d': return 30;
+      case '90d': return 90;
+      default: return 7;
     }
   }
 
-  private getCacheKey(text: string): string {
-    // Create a hash-like key from the text
-    return text.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
+  private generateCacheKey(type: string, symbols: string[], filters: any): string {
+    return `${type}-${symbols.join(',')}-${JSON.stringify(filters)}`;
   }
 
-  private getFromCache(key: string): SentimentAnalysis | null {
+  private getFromCache(key: string): any {
     const cached = this.cache.get(key);
-    if (!cached) return null;
-
-    // Cache expires after 1 hour
-    if (Date.now() - cached.timestamp > 60 * 60 * 1000) {
-      this.cache.delete(key);
-      return null;
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data;
     }
-
-    return cached.result;
+    return null;
   }
 
-  private setCache(key: string, result: SentimentAnalysis): void {
+  private setCache(key: string, data: any, ttl: number = this.defaultCacheExpiry): void {
     this.cache.set(key, {
-      result,
-      timestamp: Date.now()
+      data,
+      timestamp: Date.now(),
+      ttl
     });
-
-    // Clean up old cache entries if cache gets too large
-    if (this.cache.size > 1000) {
-      const oldestEntries = Array.from(this.cache.entries())
-        .sort((a, b) => a[1].timestamp - b[1].timestamp)
-        .slice(0, 200);
-      
-      oldestEntries.forEach(([key]) => this.cache.delete(key));
-    }
   }
 
-  // Utility methods for external use
-  public static getSentimentColor(sentiment: SentimentAnalysis): string {
-    if (sentiment.label === 'positive') {
-      return sentiment.score > 0.5 ? '#22c55e' : '#65a30d'; // Strong green or light green
-    } else if (sentiment.label === 'negative') {
-      return sentiment.score < -0.5 ? '#dc2626' : '#ea580c'; // Strong red or orange-red
-    }
-    return '#6b7280'; // Neutral gray
+  private createSentimentError(code: string, message: string, originalError?: any): SentimentError {
+    return {
+      code,
+      message,
+      source: 'SentimentAnalysisService',
+      timestamp: new Date().toISOString(),
+      retryAfter: 60000 // 1 minute
+    };
   }
 
-  public static getSentimentIcon(sentiment: SentimentAnalysis): string {
-    if (sentiment.label === 'positive') {
-      return sentiment.score > 0.5 ? '📈' : '👍';
-    } else if (sentiment.label === 'negative') {
-      return sentiment.score < -0.5 ? '📉' : '👎';
-    }
-    return '➖';
-  }
-
-  public static formatSentimentScore(score: number): string {
-    const percentage = Math.round(Math.abs(score) * 100);
-    const direction = score > 0 ? '+' : score < 0 ? '-' : '';
-    return `${direction}${percentage}%`;
+  // Cleanup old cache entries
+  private cleanupCache(): void {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    this.cache.forEach((value, key) => {
+      if (now - value.timestamp > value.ttl) {
+        keysToDelete.push(key);
+      }
+    });
+    keysToDelete.forEach(key => this.cache.delete(key));
   }
 }
 
 export const sentimentAnalysisService = new SentimentAnalysisService();
-export default SentimentAnalysisService;
