@@ -438,7 +438,7 @@ const CorrelationHeatMap: React.FC<CorrelationHeatMapProps> = ({
       {correlationStats && correlationStats.strongCorrelations.length > 0 && (
         <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-            Strong Correlations (|r| > 0.7)
+            Strong Correlations (|r| &gt; 0.7)
           </h3>
           <div className="space-y-2">
             {correlationStats.strongCorrelations.slice(0, 5).map((pair, index) => (
